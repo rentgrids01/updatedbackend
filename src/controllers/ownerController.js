@@ -5,7 +5,6 @@ const { saveFile } = require('../utils/fileUpload');
 const User = require("../models/User");
 const LandlordProfile = require("../models/LandlordProfile");
 const PreferredTenant = require("../models/PreferredTenant");
-const Property = require("../models/Property");
 const { uploadToCloudinary } = require("../utils/cloudinary");
 
 // Get Profile
