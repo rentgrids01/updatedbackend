@@ -4,7 +4,6 @@ const VisitRequest = require('../models/VisitRequest');
 const { saveFile } = require('../utils/fileUpload');
 const User = require("../models/User");
 const LandlordProfile = require("../models/LandlordProfile");
-const VisitRequest = require("../models/VisitRequest");
 const PreferredTenant = require("../models/PreferredTenant");
 const Property = require("../models/Property");
 const { uploadToCloudinary } = require("../utils/cloudinary");
