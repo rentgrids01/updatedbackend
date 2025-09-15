@@ -1,0 +1,84 @@
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const getChatbotResponse = async (userMessage) => {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful rental assistant chatbot.",
+        },
+        { role: "user", content: userMessage },
+      ],
+    });
+
+    return response.choices[0].message.content;
+  } catch (error) {
+    console.error("OpenAI API error:", error);
+    throw new Error("Failed to fetch response from AI");
+  }
+};
+
+const predefinedResponses = {
+  "anything else I can help with?":
+    "It seems like you might be looking for assistance! If you have any questions about rental listings, lease agreements, moving tips, or anything related to housing, feel free to ask. I'm here to help!",
+
+  "help in application & screening":
+    "Sure! I can assist you with the application process and tenant screening. What specific information do you need?",
+
+  "how do i apply for a rental property":
+    "Go to the property you like and click on 'Schedule Visit'. Your application form will be sent automatically to the landlord.",
+
+  "what documents do i need for tenant screening":
+    "You generally need ID proof, income proof (salary slips or bank statements), and reference details.",
+
+  // Scheduling Visits
+  "how do i schedule a visit":
+    "Select the property you like and click on 'Schedule Visit'. The landlord will be notified automatically.",
+
+  // Rent & Payments
+  "what payment methods are accepted":
+    "We accept online payments, UPI, credit/debit cards, and bank transfers.",
+
+  "when is rent due":
+    "Rent is usually due on the 1st of every month, unless otherwise specified in your lease.",
+
+  // Policies
+  "are pets allowed":
+    "Pet policies depend on the property. Some landlords allow pets, while others don’t. Please check the listing details.",
+
+  // Services
+  "any home services you want":
+    "Yes, we provide cleaning, maintenance, and moving services. Which one do you need help with?",
+
+  // Contact-related
+  "how do i contact support":
+    "You can reach our support team at support@rentgrids.com or call us at **+91-9876543210**.",
+
+  "what is your email": "You can contact us at support@rentgrids.com.",
+
+  "how can i contact the landlord":
+    "The landlord’s details will be shared after you schedule a visit or submit an application.",
+};
+
+// Function to check predefined Q&A
+const getPredefinedResponse = (message) => {
+  const lowerMessage = message.toLowerCase().trim();
+
+  for (const key in predefinedResponses) {
+    if (key.toLowerCase() === lowerMessage) {
+      return predefinedResponses[key];
+    }
+  }
+  return "I'm not sure about that. Please contact our administration team at support@rentgrids.com or call +91-9876543210.";
+};
+
+module.exports = {
+  getChatbotResponse,
+  getPredefinedResponse,
+};
