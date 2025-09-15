@@ -56,8 +56,8 @@ router.post('/saved-properties/replace', replaceSavedProperties);
 router.post("/faq", generateFAQ);
 
 // Universal Tenant Application Routes
-router.get('/applications/:applicationId', getApplications);
-router.post('/applications/step1', createApplication);
-router.patch('/applications/step2', updateApplicationStep2);
-router.patch('/applications/step3', updateApplicationStep3);
+// router.get('/applications/:applicationId', getApplications);
+// router.post('/applications/step1', createApplication);
+// router.patch('/applications/step2', updateApplicationStep2);
+// router.patch('/applications/step3', updateApplicationStep3);
 module.exports = router;
