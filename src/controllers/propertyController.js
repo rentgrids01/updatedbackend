@@ -196,6 +196,18 @@ const createProperty = async (req, res) => {
   try {
     const propertyData = req.body;
 
+    //  Parse landlordSchedule if it's a string
+    if (req.body.landlordSchedule && typeof req.body.landlordSchedule === "string") {
+      try {
+        req.body.landlordSchedule = JSON.parse(req.body.landlordSchedule);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid landlordSchedule JSON format",
+        });
+      }
+    }
+
     // Generate unique property ID
     let uniqueId;
     let isUnique = false;

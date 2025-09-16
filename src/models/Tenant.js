@@ -1,31 +1,31 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const tenantSchema = new mongoose.Schema({
   fullName: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
   },
   emailId: {
     type: String,
     required: true,
     unique: true,
     lowercase: true,
-    trim: true
+    trim: true,
   },
   password: {
     type: String,
     required: true,
-    minlength: 6
+    minlength: 6,
   },
   phonenumber: {
     type: String,
-    required: true
+    required: true,
   },
   isEmailVerified: {
     type: Boolean,
-    default: false
+    default: false,
   },
   emailVerificationToken: String,
   emailVerificationExpires: Date,
@@ -33,32 +33,32 @@ const tenantSchema = new mongoose.Schema({
   passwordResetExpires: Date,
   profilePhoto: {
     type: String,
-    default: ''
+    default: "",
   },
   avatar: {
     type: String,
-    default: ''
+    default: "",
   },
   dob: Date,
   gender: {
     type: String,
-    enum: ['Male', 'Female', 'Other']
+    enum: ["Male", "Female", "Other"],
   },
   preferredTenantType: {
     type: String,
-    enum: ['Bachelor', 'Family', 'Working Professional', 'Student']
+    enum: ["Bachelor", "Family", "Working Professional", "Student"],
   },
   moveInDate: Date,
   leaseDuration: String,
   petsAllowed: {
     type: String,
-    enum: ['Yes', 'No'],
-    default: 'No'
+    enum: ["Yes", "No"],
+    default: "No",
   },
   smokingAllowed: {
     type: String,
-    enum: ['Yes', 'No'],
-    default: 'No'
+    enum: ["Yes", "No"],
+    default: "No",
   },
   languagePreference: String,
   agePreference: String,
@@ -67,16 +67,16 @@ const tenantSchema = new mongoose.Schema({
     age: Number,
     employer: String,
     occupation: String,
-    monthlyIncome: Number
+    monthlyIncome: Number,
   },
   propertyPreferences: {
     bhkType: {
       type: String,
-      enum: ['1RK', '1BHK', '2BHK', '3BHK', '4BHK', '5BHK+']
+      enum: ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK+"],
     },
     furnishingType: {
       type: String,
-      enum: ['furnished', 'semi-furnished', 'unfurnished']
+      enum: ["furnished", "semi-furnished", "unfurnished"],
     },
     amenities: [String],
     occupants: Number,
@@ -84,44 +84,85 @@ const tenantSchema = new mongoose.Schema({
     budgetMax: Number,
     location: String,
     leaseDuration: String,
-    moveInDate: Date
+    moveInDate: Date,
   },
-  documents: [{
-    docType: String,
-    docUrl: String,
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  documents: [
+    {
+      docType: String,
+      docUrl: String,
+      uploadedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   verificationStatus: {
     type: String,
-    enum: ['pending', 'verified', 'rejected'],
-    default: 'pending'
+    enum: ["pending", "verified", "rejected"],
+    default: "pending",
+  },
+  rentalHistory: {
+    duration: String,
+    landlordContact: String,
+    previousAddress: String,
+    documents: [String],
+  },
+  preferences: {
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+    },
+    maritalStatus: {
+      type: String,
+      enum: ["single", "married", "divorced", "widowed"],
+    },
+    smoker: {
+      type: Boolean,
+      default: false,
+    },
+    eating: {
+      type: String,
+      enum: ["veg", "non-veg", "both"],
+    },
+    language: String,
+    pet: {
+      type: Boolean,
+      default: false,
+    },
+    coupleFriendly: {
+      type: Boolean,
+      default: false,
+    },
   },
   verifiedBy: String,
   videoIntroUrl: String,
   isProfileComplete: {
     type: Boolean,
-    default: false
+    default: false,
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
+  },
+  applicationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "universalTenantApplication",
+    default: null,
+    unique: true,
   },
   lastLogin: Date,
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-tenantSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+tenantSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
@@ -130,4 +171,4 @@ tenantSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-module.exports = mongoose.model('Tenant', tenantSchema);
+module.exports = mongoose.model("Tenant", tenantSchema);
