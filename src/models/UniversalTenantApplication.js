@@ -2,12 +2,12 @@ const mongoose = require("mongoose");
 
 const universalTenantApplicationSchema = new mongoose.Schema(
   {
-    applicationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "TenantProfile",
-      required: true,
-      unique: true,
-    },
+    // applicationId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Tenant",
+    //   required: true,
+    //   unique: true,
+    // },
     personalDetails: {
       age: Number,
       employer: String,

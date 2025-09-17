@@ -24,7 +24,7 @@ router.get('/:propertyId', getPropertyById);
 router.get('/:propertyId/similar', getSimilarProperties);
 
 // Owner Property Routes (auth required)
-router.get('/owner/properties', auth, requireRole(['landlord']), getOwnerProperties);
+router.get('/', auth, requireRole(['landlord']), getOwnerProperties);
 router.post('/', auth, requireRole(['landlord']), upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'documents', maxCount: 5 }

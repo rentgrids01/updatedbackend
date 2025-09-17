@@ -16,8 +16,16 @@ const {
   bulkDeleteSavedProperties,
   replaceSavedProperties,
   generateFAQ ,
+  getApplications,
+  createApplication,
   updateApplicationStep2,
   updateApplicationStep3,
+  rescheduleRequest,
+  acceptRescheduleRequest,
+  rejectRescheduleRequest,
+  createscheduleVisitRequest,
+  getVisitRequestStatus
+  
 } = require('../controllers/tenantController');
 const { auth, requireUserType } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -56,8 +64,22 @@ router.post('/saved-properties/replace', replaceSavedProperties);
 router.post("/faq", generateFAQ);
 
 // Universal Tenant Application Routes
-// router.get('/applications/:applicationId', getApplications);
-// router.post('/applications/step1', createApplication);
-// router.patch('/applications/step2', updateApplicationStep2);
-// router.patch('/applications/step3', updateApplicationStep3);
+router.get('/applications/:applicationId', getApplications);
+router.post('/applications/step1', createApplication);
+router.patch('/applications/step2', updateApplicationStep2);
+router.patch('/applications/step3', updateApplicationStep3);
+
+
+//Schedule Visit Request
+router.post("/visit-requests", createscheduleVisitRequest);
+
+//Visit Request Status
+router.get("/visit-requests", getVisitRequestStatus);
+
+// Reschedule Visits
+router.patch("/visit-requests/:requestId/reschedule", rescheduleRequest);
+
+// Accetpt and Reject Reschedule Request From Landlord
+router.patch("/visit-requests/:requestId/accept-reschedule", acceptRescheduleRequest);
+router.patch("/visit-requests/:requestId/reject-reschedule", rejectRescheduleRequest);
 module.exports = router;
