@@ -41,6 +41,24 @@ const forgotPasswordValidation = [
   body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
 ];
 
+const verifyOTPForPasswordResetValidation = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+  body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
+];
+
+const setNewPasswordValidation = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('newPassword').isLength({ min: 8, max: 20 }).withMessage('Password must be 8-20 characters long'),
+  body('confirmPassword').custom((value, { req }) => {
+    if (value !== req.body.newPassword) {
+      throw new Error('Passwords do not match');
+    }
+    return true;
+  }),
+  body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
+];
+
 // Register Tenant
 const registerTenant = async (req, res) => {
   try {
@@ -457,6 +475,120 @@ const resetPasswordWithOTP = async (req, res) => {
   }
 };
 
+// Verify OTP for Password Reset (Step 1)
+const verifyOTPForPasswordReset = async (req, res) => {
+  try {
+    const { email, otp, userType } = req.body;
+
+    // Validate userType parameter
+    if (!userType || !['tenant', 'owner'].includes(userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'userType is required and must be either "tenant" or "owner"'
+      });
+    }
+
+    // Verify OTP for password reset
+    const otpResult = await verifyOTP(email, otp, 'password-reset');
+
+    if (!otpResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: otpResult.message
+      });
+    }
+
+    // Find the specific user based on userType to ensure they exist
+    let user = null;
+    if (userType === 'tenant') {
+      user = await Tenant.findOne({ emailId: email });
+    } else if (userType === 'owner') {
+      user = await Owner.findOne({ emailId: email });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `${userType.charAt(0).toUpperCase() + userType.slice(1)} not found with this email`
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `OTP verified successfully for ${userType}. You can now set your new password.`,
+      userType: userType,
+      email: email
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Set New Password after OTP Verification (Step 2)
+const setNewPasswordWithOTP = async (req, res) => {
+  try {
+    const { email, newPassword, confirmPassword, userType } = req.body;
+
+    // Validate userType parameter
+    if (!userType || !['tenant', 'owner'].includes(userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'userType is required and must be either "tenant" or "owner"'
+      });
+    }
+
+    // Verify passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+
+    // Strong password validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be 8-20 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
+    }
+
+    // Find the specific user based on userType
+    let user = null;
+    if (userType === 'tenant') {
+      user = await Tenant.findOne({ emailId: email });
+    } else if (userType === 'owner') {
+      user = await Owner.findOne({ emailId: email });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `${userType.charAt(0).toUpperCase() + userType.slice(1)} not found with this email`
+      });
+    }
+
+    // Update password
+    user.password = newPassword; // Will be hashed by pre-save middleware
+    await user.save();
+
+    res.json({
+      success: true,
+      message: `Password updated successfully for ${userType}. Please login with your new password.`,
+      userType: userType
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   registerTenant,
   registerOwner,
@@ -467,9 +599,13 @@ module.exports = {
   sendOTP,
   verifyOTPController,
   resetPasswordWithOTP,
+  verifyOTPForPasswordReset,
+  setNewPasswordWithOTP,
   registerValidation,
   loginValidation,
   verifyOTPValidation,
   resetPasswordOTPValidation,
-  forgotPasswordValidation
+  forgotPasswordValidation,
+  verifyOTPForPasswordResetValidation,
+  setNewPasswordValidation
 };

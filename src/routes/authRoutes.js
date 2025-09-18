@@ -9,11 +9,15 @@ const {
   sendOTP,
   verifyOTPController,
   resetPasswordWithOTP,
+  verifyOTPForPasswordReset,
+  setNewPasswordWithOTP,
   registerValidation,
   loginValidation,
   verifyOTPValidation,
   resetPasswordOTPValidation,
-  forgotPasswordValidation
+  forgotPasswordValidation,
+  verifyOTPForPasswordResetValidation,
+  setNewPasswordValidation
 } = require('../controllers/authController');
 const {
   generateResetToken,
@@ -44,6 +48,10 @@ router.post('/password-reset/confirm', setNewPassword);
 
 // OTP-based Password Reset Routes
 router.post('/password-reset/otp', resetPasswordOTPValidation, validateRequest, resetPasswordWithOTP);
+
+// Two-step OTP Password Reset Routes
+router.post('/password-reset/verify-otp', verifyOTPForPasswordResetValidation, validateRequest, verifyOTPForPasswordReset);
+router.post('/password-reset/set-password', setNewPasswordValidation, validateRequest, setNewPasswordWithOTP);
 
 // Email Verification Routes
 router.post('/email/send-otp', sendOTP);
