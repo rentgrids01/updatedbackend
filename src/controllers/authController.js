@@ -8,7 +8,7 @@ const { body } = require('express-validator');
 const registerValidation = [
   body('fullName').notEmpty().withMessage('Full name is required'),
   body('emailId').isEmail().withMessage('Valid email is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 8, max: 20 }).withMessage('Password must be 8-20 characters long'),
   body('phonenumber').notEmpty().withMessage('Phone number is required')
 ];
 
@@ -20,6 +20,24 @@ const loginValidation = [
 const verifyOTPValidation = [
   body('email').isEmail().withMessage('Valid email is required'),
   body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+  body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
+];
+
+const resetPasswordOTPValidation = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+  body('newPassword').isLength({ min: 8, max: 20 }).withMessage('Password must be 8-20 characters long'),
+  body('confirmPassword').custom((value, { req }) => {
+    if (value !== req.body.newPassword) {
+      throw new Error('Passwords do not match');
+    }
+    return true;
+  }),
+  body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
+];
+
+const forgotPasswordValidation = [
+  body('emailId').isEmail().withMessage('Valid email is required'),
   body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
 ];
 
@@ -367,6 +385,78 @@ const verifyOTPController = async (req, res) => {
   }
 };
 
+// Reset Password with OTP
+const resetPasswordWithOTP = async (req, res) => {
+  try {
+    const { email, otp, newPassword, confirmPassword, userType } = req.body;
+
+    // Validate userType parameter
+    if (!userType || !['tenant', 'owner'].includes(userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'userType is required and must be either "tenant" or "owner"'
+      });
+    }
+
+    // Verify passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+
+    // Strong password validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be 8-20 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
+    }
+
+    // Verify OTP for password reset
+    const otpResult = await verifyOTP(email, otp, 'password-reset');
+
+    if (!otpResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: otpResult.message
+      });
+    }
+
+    // Find the specific user based on userType
+    let user = null;
+    if (userType === 'tenant') {
+      user = await Tenant.findOne({ emailId: email });
+    } else if (userType === 'owner') {
+      user = await Owner.findOne({ emailId: email });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `${userType.charAt(0).toUpperCase() + userType.slice(1)} not found with this email`
+      });
+    }
+
+    // Hash new password and update user
+    user.password = newPassword; // The password will be hashed by the pre-save middleware in the model
+    await user.save();
+
+    res.json({
+      success: true,
+      message: `Password reset successfully for ${userType}. Please login with your new password.`,
+      userType: userType
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   registerTenant,
   registerOwner,
@@ -376,7 +466,10 @@ module.exports = {
   forgotPassword,
   sendOTP,
   verifyOTPController,
+  resetPasswordWithOTP,
   registerValidation,
   loginValidation,
-  verifyOTPValidation
+  verifyOTPValidation,
+  resetPasswordOTPValidation,
+  forgotPasswordValidation
 };

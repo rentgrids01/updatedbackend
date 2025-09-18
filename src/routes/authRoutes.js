@@ -8,9 +8,12 @@ const {
   forgotPassword,
   sendOTP,
   verifyOTPController,
+  resetPasswordWithOTP,
   registerValidation,
   loginValidation,
-  verifyOTPValidation
+  verifyOTPValidation,
+  resetPasswordOTPValidation,
+  forgotPasswordValidation
 } = require('../controllers/authController');
 const {
   generateResetToken,
@@ -32,12 +35,15 @@ router.post('/owner/login', loginValidation, validateRequest, loginOwner);
 router.post('/owner/logout', logout);
 
 // Common routes
-router.patch('/forgot-password', forgotPassword);
+router.post('/forgot-password', forgotPasswordValidation, validateRequest, forgotPassword);
 
 // Password Reset Routes
 router.post('/password-reset/generate', generateResetToken);
 router.get('/password-reset/verify', verifyResetToken);
 router.post('/password-reset/confirm', setNewPassword);
+
+// OTP-based Password Reset Routes
+router.post('/password-reset/otp', resetPasswordOTPValidation, validateRequest, resetPasswordWithOTP);
 
 // Email Verification Routes
 router.post('/email/send-otp', sendOTP);
