@@ -9,7 +9,8 @@ const {
   sendOTP,
   verifyOTPController,
   registerValidation,
-  loginValidation
+  loginValidation,
+  verifyOTPValidation
 } = require('../controllers/authController');
 const {
   generateResetToken,
@@ -40,6 +41,6 @@ router.post('/password-reset/confirm', setNewPassword);
 
 // Email Verification Routes
 router.post('/email/send-otp', sendOTP);
-router.post('/email/verify-otp', verifyOTPController);
+router.post('/email/verify-otp', verifyOTPValidation, validateRequest, verifyOTPController);
 
 module.exports = router;

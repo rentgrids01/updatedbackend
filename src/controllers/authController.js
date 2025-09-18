@@ -17,6 +17,12 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required')
 ];
 
+const verifyOTPValidation = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+  body('userType').isIn(['tenant', 'owner']).withMessage('userType must be either "tenant" or "owner"')
+];
+
 // Register Tenant
 const registerTenant = async (req, res) => {
   try {
@@ -295,7 +301,15 @@ const sendOTP = async (req, res) => {
 // Verify OTP
 const verifyOTPController = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, userType } = req.body;
+
+    // Validate userType parameter
+    if (!userType || !['tenant', 'owner'].includes(userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'userType is required and must be either "tenant" or "owner"'
+      });
+    }
 
     const result = await verifyOTP(email, otp, 'verification');
 
@@ -306,21 +320,44 @@ const verifyOTPController = async (req, res) => {
       });
     }
 
-    // Update user email verification status
-    const tenant = await Tenant.findOne({ emailId: email });
-    const owner = await Owner.findOne({ emailId: email });
+    let user = null;
+    let verifiedUser = null;
 
-    if (tenant) {
-      tenant.isEmailVerified = true;
-      await tenant.save();
-    } else if (owner) {
-      owner.isEmailVerified = true;
-      await owner.save();
+    // Find the specific user based on userType
+    if (userType === 'tenant') {
+      user = await Tenant.findOne({ emailId: email });
+    } else if (userType === 'owner') {
+      user = await Owner.findOne({ emailId: email });
     }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `${userType.charAt(0).toUpperCase() + userType.slice(1)} not found with this email`
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: `${userType.charAt(0).toUpperCase() + userType.slice(1)} email is already verified`
+      });
+    }
+
+    // Verify the specific user
+    user.isEmailVerified = true;
+    await user.save();
+    verifiedUser = user;
 
     res.json({
       success: true,
-      message: 'Email verified successfully'
+      message: `Email verified successfully for ${userType}`,
+      userType: userType,
+      user: {
+        id: verifiedUser._id,
+        fullName: verifiedUser.fullName,
+        emailId: verifiedUser.emailId
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -340,5 +377,6 @@ module.exports = {
   sendOTP,
   verifyOTPController,
   registerValidation,
-  loginValidation
+  loginValidation,
+  verifyOTPValidation
 };
