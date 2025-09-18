@@ -5,6 +5,7 @@ const VisitRequest = require("../models/VisitRequest");
 const TenantProfile = require("../models/TenantProfile");
 const UniversalTenantApplication = require("../models/UniversalTenantApplication");
 const { saveFile } = require("../utils/fileUpload");
+const { getTenantMatchScore } = require("../services/matchService");
 const {
   getPredefinedResponse,
   getChatbotResponse,
@@ -281,10 +282,10 @@ const verifyKYC = async (req, res) => {
 
 // Get Dashboard Summary
 const getDashboardSummary = async (req, res) => {
+  const tenantId = req.user._id;
   try {
     const visitRequests = await VisitRequest.find({ tenant: req.user._id });
     const savedProperties = await SavedProperty.find({ tenant: req.user._id });
-
     const counters = {
       pendingVerification: req.user.verificationStatus === "pending" ? 1 : 0,
       requestedVisits: {
@@ -334,6 +335,18 @@ const getDashboardSummary = async (req, res) => {
       savedProperties: savedProperties.slice(-3),
     };
 
+    let matchScore = null;
+
+    if (visitRequests.length > 0) {
+      const landlordId = visitRequests[0].landlord;
+      const propertyId = visitRequests[0].property;
+      // matchScore = await getTenantMatchScore(
+      //   tenantId,
+      //   landlordId, 
+      //   propertyId
+      // );
+    }
+
     res.json({
       success: true,
       data: {
@@ -346,6 +359,7 @@ const getDashboardSummary = async (req, res) => {
             lastVerifiedAt: req.user.updatedAt,
           },
         },
+        // matchCriteria: matchScore !== null ? { score: matchScore } : null,
         counters,
         nextActions,
         recent,
@@ -530,7 +544,7 @@ const rescheduleRequest = async (req, res) => {
     const { scheduledDate, slots } = req.body;
     const tenantId = req.user._id;
 
-    if (!scheduledDate || (!slots)) {
+    if (!scheduledDate || !slots) {
       return res.status(400).json({
         success: false,
         message: "scheduledDate and time of slots are required",
@@ -686,9 +700,11 @@ const getApplications = async (req, res) => {
   try {
     const { applicationId } = req.params;
 
-    const application = await UniversalTenantApplication.findOne({ _id:applicationId })
+    const application = await UniversalTenantApplication.findOne({
+      _id: applicationId,
+    });
 
-    console.log('application', application);
+    console.log("application", application);
 
     if (!application) {
       return res.status(404).json({
@@ -716,10 +732,9 @@ const createApplication = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const { personalDetails, workStatus } = req.body;
+    const { workStatus } = req.body;
 
-   let tenantProfile = await Tenant.findOne({ _id: userId });
-
+    let tenantProfile = await Tenant.findOne({ _id: userId });
 
     if (!tenantProfile) {
       return res.status(404).json({
@@ -727,7 +742,6 @@ const createApplication = async (req, res) => {
         message: "TenantProfile not found. Please create profile first.",
       });
     }
-
 
     let application;
 
@@ -747,7 +761,22 @@ const createApplication = async (req, res) => {
       await tenantProfile.save();
     }
 
-    application.personalDetails = personalDetails;
+    if (
+      !tenantProfile.fullName ||
+      !tenantProfile.emailId ||
+      !tenantProfile.phonenumber ||
+      tenantProfile.personalDetails?.age == null
+    ) {
+      throw new Error("All personalDetails fields are required.");
+    }
+
+    application.personalDetails = {
+      name: tenantProfile.fullName,
+      email: tenantProfile.emailId,
+      contact: tenantProfile.phonenumber,
+      age: tenantProfile.personalDetails.age,
+    };
+
     application.workStatus = workStatus;
 
     await application.save();
@@ -769,7 +798,7 @@ const updateApplicationStep2 = async (req, res) => {
     const { propertyPreferences, rentalHistory, preferences, documents } =
       req.body;
 
-    const tenantProfile = await Tenant.findOne({_id: userId }).populate(
+    const tenantProfile = await Tenant.findOne({ _id: userId }).populate(
       "applicationId"
     );
     if (!tenantProfile)
@@ -810,7 +839,7 @@ const updateApplicationStep3 = async (req, res) => {
     const { videoIntroUrl } = req.body;
 
     // Fetch tenant profile and populate application
-    const tenantProfile = await Tenant.findOne({ _id:userId }).populate(
+    const tenantProfile = await Tenant.findOne({ _id: userId }).populate(
       "applicationId"
     );
 
