@@ -1,18 +1,29 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const propertyTenantCriteriaSchema = new mongoose.Schema({
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Owner",
+    required: true,
+  },
   property: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Property',
-    required: true
+    ref: "Property",
+    required: true,
   },
   preferTenantType: {
     type: String,
-    enum: ['Family', 'Bachelor Male', 'Bachelor Female', 'Working Professionals', 'Students']
+    enum: [
+      "Family",
+      "Bachelor Male",
+      "Bachelor Female",
+      "Working Professionals",
+      "Students",
+    ],
   },
   genderPreference: {
     type: String,
-    enum: ['Male', 'Female', 'Any']
+    enum: ["Male", "Female", "Any"],
   },
   languagePreference: String,
   moveInDate: Date,
@@ -21,26 +32,29 @@ const propertyTenantCriteriaSchema = new mongoose.Schema({
   agePreference: String,
   petsAllowed: {
     type: Boolean,
-    default: false
+    default: false,
   },
   smokingAllowed: {
     type: Boolean,
-    default: false
+    default: false,
   },
   coupleFriendly: {
     type: Boolean,
-    default: false
+    default: false,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 propertyTenantCriteriaSchema.index({ property: 1 });
 
-module.exports = mongoose.model('PropertyTenantCriteria', propertyTenantCriteriaSchema);
+module.exports = mongoose.model(
+  "PropertyTenantCriteria",
+  propertyTenantCriteriaSchema
+);

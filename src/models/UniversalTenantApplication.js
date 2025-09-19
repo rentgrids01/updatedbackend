@@ -9,14 +9,14 @@ const universalTenantApplicationSchema = new mongoose.Schema(
     //   unique: true,
     // },
     personalDetails: {
-      age: Number,
-      employer: String,
-      occupation: String,
-      monthlyIncome: Number,
+      name: { type: String, required: false },
+      email: { type: String, required: false },
+      contact: { type: String, required: false },
+      age: { type: Number, required: false },
     },
     workStatus: {
-      employeeStatus: String,
-      employerName: String,
+      employee: String,
+      employer: String,
     },
     propertyPreferences: {
       bhkType: {
