@@ -1,14 +1,19 @@
 const mongoose = require('mongoose');
 
 const propertyTenantCriteriaSchema = new mongoose.Schema({
+  owner:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Owner',
+    required: true
+  },
   property: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Property',
     required: true
   },
   preferTenantType: {
-    type: String,
-    enum: ['Family', 'Bachelor Male', 'Bachelor Female', 'Working Professionals', 'Students']
+    type: [String],
+    enum: ['Family', 'Bachelor Male', 'Bachelor Female', 'Working Professional', 'Students']
   },
   genderPreference: {
     type: String,
@@ -17,7 +22,7 @@ const propertyTenantCriteriaSchema = new mongoose.Schema({
   languagePreference: String,
   moveInDate: Date,
   leaseDuration: String,
-  noOfOccupants: Number,
+  numberOfOccupants: Number,
   agePreference: String,
   petsAllowed: {
     type: Boolean,
@@ -30,6 +35,10 @@ const propertyTenantCriteriaSchema = new mongoose.Schema({
   coupleFriendly: {
     type: Boolean,
     default: false
+  },
+  notes:{
+    type: String,
+    maxlength: 1000,
   },
   createdAt: {
     type: Date,

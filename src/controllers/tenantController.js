@@ -530,7 +530,7 @@ const rescheduleRequest = async (req, res) => {
     const { scheduledDate, slots } = req.body;
     const tenantId = req.user._id;
 
-    if (!scheduledDate || (!slots)) {
+    if (!scheduledDate || !slots) {
       return res.status(400).json({
         success: false,
         message: "scheduledDate and time of slots are required",
@@ -686,9 +686,11 @@ const getApplications = async (req, res) => {
   try {
     const { applicationId } = req.params;
 
-    const application = await UniversalTenantApplication.findOne({ _id:applicationId })
+    const application = await UniversalTenantApplication.findOne({
+      _id: applicationId,
+    });
 
-    console.log('application', application);
+    console.log("application", application);
 
     if (!application) {
       return res.status(404).json({
@@ -712,24 +714,86 @@ const getApplications = async (req, res) => {
   }
 };
 // Step 1 - Personal Details & Work Status
+// const createApplication = async (req, res) => {
+//   try {
+//     const userId = req.user._id;
+//     const { personalDetails, workStatus } = req.body;
+
+//     let tenantProfile = await Tenant.findOne({ _id: userId });
+//     if (!tenantProfile) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "TenantProfile not found. Please create profile first.",
+//       });
+//     }
+
+//     let application;
+//     if (tenantProfile.applicationId) {
+//       application = await UniversalTenantApplication.findById(
+//         tenantProfile.applicationId
+//       );
+//     }
+
+//     if (!application) {
+//       application = new UniversalTenantApplication({
+//         tenantId: tenantProfile._id,
+//         personalDetails,
+//         workStatus,
+//       });
+//       await application.save();
+//       tenantProfile.applicationId = application._id;
+//       await tenantProfile.save();
+//     } else {
+//       application.personalDetails = personalDetails;
+//       application.workStatus = workStatus;
+//       await application.save();
+//     }
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Step 1 saved",
+//       data: application,
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// };
+
 const createApplication = async (req, res) => {
   try {
     const userId = req.user._id;
+    const { workStatus } = req.body;
 
-    const { personalDetails, workStatus } = req.body;
-
-   let tenantProfile = await Tenant.findOne({ _id: userId });
-
-
-    if (!tenantProfile) {
-      return res.status(404).json({
+    if (!workStatus || !workStatus.employee || !workStatus.employer) {
+      return res.status(400).json({
         success: false,
-        message: "TenantProfile not found. Please create profile first.",
+        message: "Work status details (employee and employer) are required.",
       });
     }
 
+    const tenantProfile = await Tenant.findById(userId);
+    if (!tenantProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Tenant profile not found. Please create profile first.",
+      });
+    }
 
-    let application;
+    if (!tenantProfile.isProfileComplete) {
+      return res.status(400).json({
+        success: false,
+        message: "Please complete your profile before filling out the application form.",
+      });
+    }
+
+    const personalDetails = {
+      fullName: tenantProfile.fullName,
+      age: tenantProfile.age,
+      emailId: tenantProfile.emailId,
+      phonenumber: tenantProfile.phonenumber,
+    };
+
+    let application = null;
 
     if (tenantProfile.applicationId) {
       application = await UniversalTenantApplication.findById(
@@ -739,28 +803,60 @@ const createApplication = async (req, res) => {
 
     if (!application) {
       application = new UniversalTenantApplication({
-        applicationId: tenantProfile._id,
+        tenantId: tenantProfile._id,
+        personalDetails,
+        workStatus,
       });
+      
       await application.save();
 
       tenantProfile.applicationId = application._id;
       await tenantProfile.save();
+
+      return res.status(201).json({
+        success: true,
+        message: "Application created successfully - Step 1 saved",
+        data: application,
+      });
+    } else {
+      // Update existing application
+      application.personalDetails = personalDetails;
+      application.workStatus = workStatus;
+      application.updatedAt = new Date();
+      
+      await application.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Application updated successfully - Step 1 saved",
+        data: application,
+      });
     }
 
-    application.personalDetails = personalDetails;
-    application.workStatus = workStatus;
-
-    await application.save();
-
-    res.status(201).json({
-      success: true,
-      message: "Step 1 saved",
-      data: application,
-    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Error in createApplication:", err);
+
+    // Handle specific MongoDB duplicate key error
+    if (err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Application already exists for this tenant.",
+        error: "Duplicate application error"
+      });
+    }
+
+    // Handle validation errors
+
+    // Generic server error
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: err.message
+    });
   }
 };
+
+
 
 // Step 2 - Property Preferences, Rental History, Preferences, Documents
 const updateApplicationStep2 = async (req, res) => {
@@ -769,7 +865,7 @@ const updateApplicationStep2 = async (req, res) => {
     const { propertyPreferences, rentalHistory, preferences, documents } =
       req.body;
 
-    const tenantProfile = await Tenant.findOne({_id: userId }).populate(
+    const tenantProfile = await Tenant.findOne({ _id: userId }).populate(
       "applicationId"
     );
     if (!tenantProfile)
@@ -810,7 +906,7 @@ const updateApplicationStep3 = async (req, res) => {
     const { videoIntroUrl } = req.body;
 
     // Fetch tenant profile and populate application
-    const tenantProfile = await Tenant.findOne({ _id:userId }).populate(
+    const tenantProfile = await Tenant.findOne({ _id: userId }).populate(
       "applicationId"
     );
 
@@ -849,7 +945,7 @@ const createscheduleVisitRequest = async (req, res) => {
     const tenantId = req.user._id;
     const { property, scheduledDate, slots, status, notes } = req.body;
     const propertyDoc = await Property.findById(property);
-    console.log("propertyDoc", propertyDoc);
+    // console.log("propertyDoc", propertyDoc);
 
     if (!propertyDoc) {
       return res
