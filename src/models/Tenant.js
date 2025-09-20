@@ -40,51 +40,10 @@ const tenantSchema = new mongoose.Schema({
     default: "",
   },
   dob: Date,
+  age: Number,
   gender: {
     type: String,
     enum: ["Male", "Female", "Other"],
-  },
-  preferredTenantType: {
-    type: String,
-    enum: ["Bachelor", "Family", "Working Professional", "Student"],
-  },
-  moveInDate: Date,
-  leaseDuration: String,
-  petsAllowed: {
-    type: String,
-    enum: ["Yes", "No"],
-    default: "No",
-  },
-  smokingAllowed: {
-    type: String,
-    enum: ["Yes", "No"],
-    default: "No",
-  },
-  languagePreference: String,
-  agePreference: String,
-  address: String,
-  personalDetails: {
-    age: Number,
-    employer: String,
-    occupation: String,
-    monthlyIncome: Number,
-  },
-  propertyPreferences: {
-    bhkType: {
-      type: String,
-      enum: ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK+"],
-    },
-    furnishingType: {
-      type: String,
-      enum: ["furnished", "semi-furnished", "unfurnished"],
-    },
-    amenities: [String],
-    occupants: Number,
-    budgetMin: Number,
-    budgetMax: Number,
-    location: String,
-    leaseDuration: String,
-    moveInDate: Date,
   },
   documents: [
     {
@@ -101,45 +60,6 @@ const tenantSchema = new mongoose.Schema({
     enum: ["pending", "verified", "rejected"],
     default: "pending",
   },
-  rentalHistory: {
-    duration: String,
-    landlordContact: String,
-    previousAddress: String,
-    documents: [String],
-  },
-  preferences: {
-    gender: {
-      type: String,
-      enum: ["male", "female", "other"],
-    },
-    maritalStatus: {
-      type: String,
-      enum: ["single", "married", "divorced", "widowed"],
-    },
-    smoker: {
-      type: Boolean,
-      default: false,
-    },
-    eating: {
-      type: String,
-      enum: ["veg", "non-veg", "both"],
-    },
-    language: String,
-    pet: {
-      type: Boolean,
-      default: false,
-    },
-    coupleFriendly: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  verifiedBy: String,
-  videoIntroUrl: String,
-  isProfileComplete: {
-    type: Boolean,
-    default: false,
-  },
   isActive: {
     type: Boolean,
     default: true,
@@ -147,8 +67,11 @@ const tenantSchema = new mongoose.Schema({
   applicationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "universalTenantApplication",
-    default: null,
-    unique: true,
+    sparse: true,
+  },
+  isProfileComplete :{
+    type: Boolean,
+    default: false,
   },
   lastLogin: Date,
   createdAt: {
@@ -160,6 +83,7 @@ const tenantSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
 
 tenantSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

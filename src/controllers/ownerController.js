@@ -1,16 +1,95 @@
-const Owner = require('../models/Owner');
-const Property = require('../models/Property');
-const VisitRequest = require('../models/VisitRequest');
+const Owner = require("../models/Owner");
+const Property = require("../models/Property");
+const VisitRequest = require("../models/VisitRequest");
 // const { saveFile } = require('../utils/fileUpload');
 // const User = require("../models/User");
 // const LandlordProfile = require("../models/LandlordProfile");
-const PreferredTenant = require("../models/PreferredTenant");
+const Schedule = require("../models/Schedule");
+const PropertyTenantCriteria = require("../models/PropertyTenantCriteria");
 // const { uploadToCloudinary } = require("../utils/cloudinary");
+const UniversalTenantApplication = require("../models/UniversalTenantApplication");
+const calculateMatchScore = require("../utils/calculateMatchScore");
+
+// Get Dashboard
+
+const getDashboard = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+
+    const properties = await Property.find({ owner: ownerId }).lean();
+    if (!properties.length) return res.json({ success: true, data: [] });
+
+    const propertyIds = properties.map((p) => p._id);
+    const criteriaList = await PropertyTenantCriteria.find({
+      property: { $in: propertyIds },
+    }).lean();
+
+    const visitRequests = await VisitRequest.find({
+      property: { $in: propertyIds },
+    })
+      .populate({
+        path: "tenant",
+        select: "fullName emailId phonenumber age gender applicationId",
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const tenantAppIds = visitRequests
+      .map((vr) => vr.tenant.applicationId)
+      .filter(Boolean);
+    const tenantApplications = await UniversalTenantApplication.find({
+      _id: { $in: tenantAppIds },
+    }).lean();
+
+    const tenantAppMap = {};
+    tenantApplications.forEach((app) => {
+      tenantAppMap[app.tenantId.toString()] = app;
+    });
+
+    const criteriaMap = {};
+    criteriaList.forEach((c) => {
+      criteriaMap[c.property.toString()] = c;
+    });
+
+    const dashboard = properties.map((property) => {
+      const propertyCriteria = criteriaMap[property._id.toString()];
+
+      const requestsForProperty = visitRequests.filter(
+        (vr) => vr.property.toString() === property._id.toString()
+      );
+
+      const tenants = requestsForProperty.map((request) => {
+        const tenantId = request.tenant._id.toString();
+        const tenantApp = tenantAppMap[tenantId];
+
+        return {
+          tenant: request.tenant,
+          visitRequest: request,
+          matchScore: calculateMatchScore(propertyCriteria, tenantApp),
+        };
+      });
+
+      const topTenants = tenants
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 5);
+
+      return {
+        property,
+        tenants:topTenants,
+      };
+    });
+
+    return res.json({ success: true, data: dashboard });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 // Get Profile
 const getProfile = async (req, res) => {
   try {
-    const owner = await Owner.findById(req.user._id).select('-password');
+    const owner = await Owner.findById(req.user._id).select("-password");
 
     // const profile = await LandlordProfile.findOne({
     //   userId: req.user._id,
@@ -19,18 +98,18 @@ const getProfile = async (req, res) => {
     if (!owner) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: "Profile not found",
       });
     }
 
     res.json({
       success: true,
-      data: owner
+      data: owner,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -48,7 +127,7 @@ const createProfile = async (req, res) => {
       gstNumber,
       panCard,
       aadhaarCard,
-      address
+      address,
     } = req.body;
 
     const owner = await Owner.findByIdAndUpdate(
@@ -64,20 +143,20 @@ const createProfile = async (req, res) => {
         panCard,
         aadhaarCard,
         address,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       { new: true, runValidators: true }
-    ).select('-password');
+    ).select("-password");
 
     res.json({
       success: true,
-      message: 'Profile created successfully',
-      data: owner
+      message: "Profile created successfully",
+      data: owner,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -88,28 +167,27 @@ const updateProfile = async (req, res) => {
     const updateData = req.body;
     updateData.updatedAt = new Date();
 
-    const owner = await Owner.findByIdAndUpdate(
-      req.user._id,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+    const owner = await Owner.findByIdAndUpdate(req.user._id, updateData, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
 
     if (!owner) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: "Profile not found",
       });
     }
 
     res.json({
       success: true,
-      message: 'Profile updated successfully',
-      data: owner
+      message: "Profile updated successfully",
+      data: owner,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -123,17 +201,17 @@ const uploadAvatar = async (req, res) => {
       req.user._id,
       { avatar, updatedAt: new Date() },
       { new: true }
-    ).select('-password');
+    ).select("-password");
 
     res.json({
       success: true,
-      message: 'Avatar updated successfully',
-      data: { avatar: owner.avatar }
+      message: "Avatar updated successfully",
+      data: { avatar: owner.avatar },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -144,13 +222,13 @@ const uploadProfilePhoto = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No photo uploaded'
+        message: "No photo uploaded",
       });
     }
 
     const result = await saveFile(
       req.file.buffer,
-      'profile_photos',
+      "profile_photos",
       req.file.originalname
     );
 
@@ -158,17 +236,17 @@ const uploadProfilePhoto = async (req, res) => {
       req.user._id,
       { profilePhoto: result.url, updatedAt: new Date() },
       { new: true }
-    ).select('-password');
+    ).select("-password");
 
     res.json({
       success: true,
-      message: 'Profile photo uploaded successfully',
-      data: { profilePhoto: owner.profilePhoto }
+      message: "Profile photo uploaded successfully",
+      data: { profilePhoto: owner.profilePhoto },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -179,7 +257,7 @@ const uploadDocument = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No document uploaded'
+        message: "No document uploaded",
       });
     }
 
@@ -187,29 +265,29 @@ const uploadDocument = async (req, res) => {
 
     const result = await saveFile(
       req.file.buffer,
-      'owner_documents',
+      "owner_documents",
       req.file.originalname
     );
 
     const owner = await Owner.findById(req.user._id);
     owner.documents.push({
       docType,
-      docUrl: result.url
+      docUrl: result.url,
     });
     await owner.save();
 
     res.json({
       success: true,
-      message: 'Document uploaded successfully',
+      message: "Document uploaded successfully",
       document: {
         docType,
-        docUrl: result.url
-      }
+        docUrl: result.url,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -217,16 +295,16 @@ const uploadDocument = async (req, res) => {
 // Get Documents
 const getDocuments = async (req, res) => {
   try {
-    const owner = await Owner.findById(req.user._id).select('documents');
-    
+    const owner = await Owner.findById(req.user._id).select("documents");
+
     res.json({
       success: true,
-      data: owner.documents
+      data: owner.documents,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -237,17 +315,19 @@ const deleteDocument = async (req, res) => {
     const { id } = req.params;
 
     const owner = await Owner.findById(req.user._id);
-    owner.documents = owner.documents.filter(doc => doc._id.toString() !== id);
+    owner.documents = owner.documents.filter(
+      (doc) => doc._id.toString() !== id
+    );
     await owner.save();
 
     res.json({
       success: true,
-      message: 'Document deleted successfully'
+      message: "Document deleted successfully",
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -261,17 +341,17 @@ const verifyKYC = async (req, res) => {
       req.user._id,
       { verificationStatus, verifiedBy, updatedAt: new Date() },
       { new: true }
-    ).select('-password');
+    ).select("-password");
 
     res.json({
       success: true,
-      message: 'KYC verification updated successfully',
-      data: { verificationStatus: owner.verificationStatus }
+      message: "KYC verification updated successfully",
+      data: { verificationStatus: owner.verificationStatus },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -280,15 +360,15 @@ const verifyKYC = async (req, res) => {
 const getVisitRequests = async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
-    
+    console.log("landlord id", req.user._id);
     const query = { landlord: req.user._id };
     if (status) {
       query.status = status;
     }
 
     const visitRequests = await VisitRequest.find(query)
-      .populate('tenant', 'fullName emailId phonenumber profilePhoto')
-      .populate('property', 'title location images propertyId')
+      .populate("tenant", "fullName emailId phonenumber profilePhoto")
+      .populate("property", "title location images propertyId")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -302,14 +382,14 @@ const getVisitRequests = async (req, res) => {
         pagination: {
           current: parseInt(page),
           total: Math.ceil(total / limit),
-          hasNext: page * limit < total
-        }
-      }
+          hasNext: page * limit < total,
+        },
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -318,62 +398,100 @@ const getVisitRequests = async (req, res) => {
 const updateVisitRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { action, date, note } = req.body;
+    const { action, date, time, note } = req.body;
 
     const visitRequest = await VisitRequest.findById(requestId);
     if (!visitRequest) {
       return res.status(404).json({
         success: false,
-        message: 'Visit request not found'
+        message: "Visit request not found",
       });
     }
 
     if (visitRequest.landlord.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
 
     let updateData = { updatedAt: new Date() };
 
     switch (action) {
-      case 'accept':
-        updateData.status = 'landlord_approved';
-        updateData.progress = 80;
+      case "reject":
+        updateData.status = "landlord_rejected";
+        updateData.notes = note || visitRequest.notes;
         break;
-      case 'reject':
-        updateData.status = 'landlord_rejected';
+
+      case "accept_and_schedule":
+        if (!date || !time) {
+          return res.status(400).json({
+            success: false,
+            message: "Date and time are required to schedule a visit",
+          });
+        }
+
+        // Normalize times for comparison
+        const normalizedTime = time.trim().toLowerCase();
+
+        // Find matching slot
+        const matchedSlot = visitRequest.slots.find(
+          (slot) => slot.scheduledTime.trim().toLowerCase() === normalizedTime
+        );
+
+        if (!matchedSlot) {
+          return res.status(400).json({
+            success: false,
+            message: "Selected time does not match tenant's available slots",
+          });
+        }
+
+        // Update visit request
+        updateData.status = "landlord_approved";
+        updateData.scheduledDate = date;
+        updateData.scheduledTime = time;
+        updateData.notes = note || visitRequest.notes;
         updateData.progress = 100;
+
+        // Create a confirmed schedule
+        await Schedule.create({
+          tenant: visitRequest.tenant,
+          landlord: visitRequest.landlord,
+          property: visitRequest.property,
+          date,
+          time,
+          notes: note,
+          status: "confirmed",
+        });
+
+        // Remove booked slot safely
+        visitRequest.slots = visitRequest.slots.filter(
+          (slot) => slot.scheduledTime.trim().toLowerCase() !== normalizedTime
+        );
+        await visitRequest.save();
+
         break;
-      case 'schedule':
-        updateData.status = 'scheduled';
-        updateData.scheduledDate = new Date(date);
-        updateData.notes = note;
-        updateData.progress = 100;
-        break;
+
       default:
         return res.status(400).json({
           success: false,
-          message: 'Invalid action'
+          message: "Invalid action",
         });
     }
 
-    const updatedRequest = await VisitRequest.findByIdAndUpdate(
-      requestId,
-      updateData,
-      { new: true }
-    );
+    // Return updated visit request
+    const updatedRequest = await VisitRequest.findById(requestId);
 
     res.json({
       success: true,
-      message: `Visit request ${action}ed successfully`,
-      data: updatedRequest
+      message: `Visit request ${action.replace("_", " ")} successfully`,
+      data: updatedRequest,
     });
   } catch (error) {
+    console.error("Error updating visit request:", error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -419,7 +537,7 @@ const acceptRescheduleRequest = async (req, res) => {
     console.error("Error accepting reschedule:", error);
     res.status(500).json({ success: false, message: error.message });
   }
-}
+};
 
 // Reject Reschedule Request
 const rejectRescheduleRequest = async (req, res) => {
@@ -472,13 +590,12 @@ const rejectRescheduleRequest = async (req, res) => {
 
 // Reschedule Visit Request
 const RescheduleVisit = async (req, res) => {
-   try {
+  try {
     const { requestId } = req.params;
     const { scheduledDate, slots } = req.body;
     const ownerId = req.user._id;
 
-   
-    if (!scheduledDate || (!slots)) {
+    if (!scheduledDate || !slots) {
       return res.status(400).json({
         success: false,
         message: "scheduledDate and time of slots are required",
@@ -489,8 +606,6 @@ const RescheduleVisit = async (req, res) => {
       "property",
       "landlord"
     );
-
-    
 
     if (!visit) {
       return res.status(404).json({
@@ -553,14 +668,14 @@ const RescheduleVisit = async (req, res) => {
       error: error.message,
     });
   }
-}
+};
 
 // Create Preferred Tenant
 const createPreferredTenant = async (req, res) => {
   try {
     const { propertyId } = req.params;
     const {
-      tenantTypes,
+      preferTenantType,
       moveInDate,
       leaseDurationPreference,
       numberOfOccupants,
@@ -577,20 +692,19 @@ const createPreferredTenant = async (req, res) => {
     if (!property) {
       return res.status(404).json({
         success: false,
-        message: 'Property not found'
+        message: "Property not found",
       });
     }
 
-
-      if (property.owner.toString() !== req.user._id.toString()) {
+    if (property.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to set preferences for this property",
       });
     }
 
-    const existingCriteria = await PreferredTenant.findOne({
-      landlord: req.user._id,
+    const existingCriteria = await PropertyTenantCriteria.findOne({
+      owner: req.user._id,
       property: propertyId,
     });
 
@@ -601,12 +715,12 @@ const createPreferredTenant = async (req, res) => {
       });
     }
 
-    const preferredTenant = await PreferredTenant.create({
-      landlord: req.user._id,
+    const preferredTenant = await PropertyTenantCriteria.create({
+      owner: req.user._id,
       property: propertyId,
-      tenantTypes,
+      preferTenantType,
       notes,
-       moveInDate,
+      moveInDate,
       leaseDurationPreference,
       numberOfOccupants,
       agePreference,
@@ -619,13 +733,13 @@ const createPreferredTenant = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Preferred tenant created successfully',
-      data: preferredTenant
+      message: "Preferred tenant created successfully",
+      data: preferredTenant,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -634,23 +748,25 @@ const createPreferredTenant = async (req, res) => {
 const getPreferredTenants = async (req, res) => {
   try {
     const { propertyId } = req.query;
-    
-    const query = { landlord: req.user._id };
+
+    const query = { owner: req.user._id };
     if (propertyId) {
       query.property = propertyId;
     }
 
-    const preferredTenants = await PreferredTenant.find(query)
-      .populate('property', 'title location');
+    const preferredTenants = await PropertyTenantCriteria.find(query).populate(
+      "property",
+      "title location"
+    );
 
     res.json({
       success: true,
-      data: preferredTenants
+      data: preferredTenants,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -659,38 +775,95 @@ const getPreferredTenants = async (req, res) => {
 const updatePreferredTenant = async (req, res) => {
   try {
     const { preferredTenantId } = req.params;
-    const { tenantTypes, notes } = req.body;
 
-    const preferredTenant = await PreferredTenant.findById(preferredTenantId);
+    const preferredTenant = await PropertyTenantCriteria.findById(
+      preferredTenantId
+    );
     if (!preferredTenant) {
       return res.status(404).json({
         success: false,
-        message: 'Preferred tenant not found'
+        message: "Preferred tenant not found",
       });
     }
 
-    if (preferredTenant.landlord.toString() !== req.user._id.toString()) {
+    if (preferredTenant.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message:
+          "You are not authorized to update this preferred tenant criteria",
       });
     }
 
-    const updated = await PreferredTenant.findByIdAndUpdate(
+    const updateFields = {};
+    const allowedFields = [
+      "preferTenantType",
+      "moveInDate",
+      "leaseDurationPreference",
+      "numberOfOccupants",
+      "agePreference",
+      "genderPreferences",
+      "languagePreferences",
+      "petsAllowed",
+      "smokingAllowed",
+      "coupleFriendly",
+      "notes",
+    ];
+
+    let hasFields = false;
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        hasFields = true;
+        if (field === "preferTenantType") {
+          updateFields[field] = Array.isArray(req.body[field])
+            ? req.body[field]
+            : [req.body[field]];
+        } else if (
+          ["petsAllowed", "smokingAllowed", "coupleFriendly"].includes(field)
+        ) {
+          if (typeof req.body[field] === "string") {
+            updateFields[field] = req.body[field].toLowerCase() === "true";
+          } else {
+            updateFields[field] = req.body[field];
+          }
+        } else {
+          updateFields[field] = req.body[field];
+        }
+      }
+    }
+
+    if (!hasFields) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided to update",
+      });
+    }
+
+    updateFields.updatedAt = new Date();
+
+    const updatedTenant = await PropertyTenantCriteria.findByIdAndUpdate(
       preferredTenantId,
-      { tenantTypes, notes, updatedAt: new Date() },
+      { $set: updateFields },
       { new: true }
     );
 
-    res.json({
+    if (!updatedTenant) {
+      return res.status(500).json({
+        success: false,
+        message: "Update failed. Please try again.",
+      });
+    }
+
+    res.status(200).json({
       success: true,
-      message: 'Preferred tenant updated successfully',
-      data: updated
+      message: "Preferred tenant updated successfully",
+      data: updatedTenant,
     });
   } catch (error) {
+    console.error("Update Preferred Tenant Error:", error.message);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -700,32 +873,33 @@ const deletePreferredTenant = async (req, res) => {
   try {
     const { preferredTenantId } = req.params;
 
-    const preferredTenant = await PreferredTenant.findById(preferredTenantId);
+    const preferredTenant = await PropertyTenantCriteria.findById(
+      preferredTenantId
+    );
     if (!preferredTenant) {
       return res.status(404).json({
         success: false,
-        message: 'Preferred tenant not found'
+        message: "Preferred tenant not found",
       });
     }
 
     if (preferredTenant.landlord.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
-    
 
-    await PreferredTenant.findByIdAndDelete(preferredTenantId);
+    await PropertyTenantCriteria.findByIdAndDelete(preferredTenantId);
 
     res.json({
       success: true,
-      message: 'Preferred tenant deleted successfully'
+      message: "Preferred tenant deleted successfully",
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -747,5 +921,6 @@ module.exports = {
   deletePreferredTenant,
   acceptRescheduleRequest,
   rejectRescheduleRequest,
-  RescheduleVisit
+  RescheduleVisit,
+  getDashboard,
 };

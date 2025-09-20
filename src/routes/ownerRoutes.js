@@ -18,6 +18,7 @@ const {
   getPreferredTenants,
   updatePreferredTenant,
   deletePreferredTenant,
+  getDashboard
 } = require("../controllers/ownerController");
 const { auth, requireUserType } = require("../middleware/auth");
 const upload = require("../middleware/upload");
@@ -27,6 +28,8 @@ const router = express.Router();
 // Apply auth middleware to all owner routes
 router.use(auth);
 router.use(requireUserType(["owner"]));
+
+router.get('/dashboard',getDashboard)
 
 // Profile Routes
 router.get("/profile", getProfile);

@@ -196,7 +196,18 @@ const createProperty = async (req, res) => {
   try {
     const propertyData = req.body;
 
-    //  Parse landlordSchedule if it's a string
+    const loc = propertyData.location || {};
+
+    const requiredFields = ["city", "state", "locality", "fullAddress"];
+    const missingFields = requiredFields.filter((field) => !loc[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
     if (req.body.landlordSchedule && typeof req.body.landlordSchedule === "string") {
       try {
         req.body.landlordSchedule = JSON.parse(req.body.landlordSchedule);
@@ -208,42 +219,33 @@ const createProperty = async (req, res) => {
       }
     }
 
-    // Generate unique property ID
     let uniqueId;
     let isUnique = false;
     while (!isUnique) {
       uniqueId = generatePropertyId();
       const existing = await Property.findOne({ uniqueId });
-      if (!existing) {
-        isUnique = true;
-      }
+      if (!existing) isUnique = true;
     }
-
     propertyData.uniqueId = uniqueId;
 
-    // Handle location coordinates
-    if (propertyData.latitude && propertyData.longitude) {
-      propertyData.location = {
-        ...propertyData.location,
-        coordinates: {
-          latitude: parseFloat(propertyData.latitude),
-          longitude: parseFloat(propertyData.longitude)
-        }
+    let coordinates = {};
+    if (loc.coordinates?.latitude && loc.coordinates?.longitude) {
+      coordinates = {
+        latitude: parseFloat(loc.coordinates.latitude),
+        longitude: parseFloat(loc.coordinates.longitude),
       };
     }
 
-    // Set location object
     propertyData.location = {
-      city: propertyData.city,
-      state: propertyData.state,
-      locality: propertyData.locality,
-      landmark: propertyData.landmark,
-      zipcode: propertyData.zipcode,
-      fullAddress: propertyData.fullAddress,
-      coordinates: propertyData.location?.coordinates || {}
+      city: loc.city,
+      state: loc.state,
+      locality: loc.locality,
+      landmark: loc.landmark || "",
+      zipcode: loc.zipcode || "",
+      fullAddress: loc.fullAddress,
+      coordinates,
     };
 
-    // Clean up individual location fields
     delete propertyData.city;
     delete propertyData.state;
     delete propertyData.locality;
@@ -255,23 +257,17 @@ const createProperty = async (req, res) => {
 
     propertyData.owner = req.user._id;
 
-    // Handle file uploads
-    let imageUrls = [];
-    let documentUrls = [];
+    const imageUrls = [];
+    const documentUrls = [];
 
     if (req.files) {
       if (req.files.images) {
         for (const file of req.files.images) {
           try {
-            const result = await saveFile(
-              file.buffer,
-              'property_images',
-              file.originalname
-            );
+            const result = await saveFile(file.buffer, "property_images", file.originalname);
             imageUrls.push(result.url);
           } catch (error) {
-            console.error('Image upload failed:', error.message);
-            // Continue without this image rather than failing the entire request
+            console.error("Image upload failed:", error.message);
           }
         }
       }
@@ -279,15 +275,10 @@ const createProperty = async (req, res) => {
       if (req.files.documents) {
         for (const file of req.files.documents) {
           try {
-            const result = await saveFile(
-              file.buffer,
-              'property_documents',
-              file.originalname
-            );
+            const result = await saveFile(file.buffer, "property_documents", file.originalname);
             documentUrls.push(result.url);
           } catch (error) {
-            console.error('Document upload failed:', error.message);
-            // Continue without this document rather than failing the entire request
+            console.error("Document upload failed:", error.message);
           }
         }
       }
@@ -298,26 +289,26 @@ const createProperty = async (req, res) => {
 
     const property = await Property.create(propertyData);
 
-    // Create tenant criteria if provided
     if (req.body.tenantCriteria) {
       await PropertyTenantCriteria.create({
         property: property._id,
-        ...req.body.tenantCriteria
+        ...req.body.tenantCriteria,
       });
     }
 
     res.status(201).json({
       success: true,
-      message: 'Property created successfully',
-      data: property
+      message: "Property created successfully",
+      data: property,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
+
 
 // Update Property
 const updateProperty = async (req, res) => {

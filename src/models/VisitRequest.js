@@ -18,34 +18,38 @@ const visitRequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['submitted', 'profile_verified', 'landlord_reviewing', 'visit_requested', 'landlord_approved', 'landlord_rejected', 'tenant_confirmed', 'scheduled', 'completed', 'cancelled_by_tenant', 'cancelled_by_landlord', 'expired_auto_reject'],
-    default: 'submitted'
+    enum: ['profile_verified', 'landlord_reviewing', 'visit_requested', 'landlord_approved', 'landlord_rejected', 'tenant_confirmed', 'scheduled', 'completed', 'cancelled_by_tenant', 'cancelled_by_landlord', 'expired_auto_reject','pending'],
+    default: 'pending'
   },
-  preferredSlots: [{
-    start: Date,
-    end: Date
-  }],
-  selectedSlot: {
-    slotId: String,
-    start: Date,
-    end: Date
+  scheduledDate: {
+    type: Date,
+    required: true,
   },
+  slots: [
+    {
+      scheduledTime: {
+        type: String,
+        required: true,
+        match: /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i,
+      },
+    },
+  ],
   coApplicants: [{
     name: String,
     email: String,
     phone: String
   }],
-  consents: {
-    terms: Boolean,
-    pdpa: Boolean
-  },
-  progress: {
-    type: Number,
-    default: 0
-  },
+  // consents: {
+  //   terms: Boolean,
+  //   pdpa: Boolean
+  // },
+  // progress: {
+  //   type: Number,
+  //   default: 0
+  // },
   paymentRequired: {
     type: Boolean,
-    default: true
+    default: false
   },
   paymentAmount: {
     type: Number,
@@ -57,10 +61,8 @@ const visitRequestSchema = new mongoose.Schema({
     default: 'pending'
   },
   paymentId: String,
-  reasonCode: String,
-  reasonText: String,
-  scheduledDate: Date,
-  scheduledTime: String,
+  // reasonCode: String,
+  // reasonText: String,
   notes: String,
   createdAt: {
     type: Date,

@@ -1,9 +1,8 @@
 const mongoose = require("mongoose");
 
-// Function to generate unique property ID
 const generatePropertyId = () => {
   const prefix = "RENT";
-  const randomNum = Math.floor(Math.random() * 900000) + 100000; // 6 digit number
+  const randomNum = Math.floor(Math.random() * 900000) + 100000;
   return `${prefix}${randomNum}`;
 };
 
@@ -50,7 +49,10 @@ const propertySchema = new mongoose.Schema({
     },
   },
   securityDeposit: Number,
-  maintenanceCharge: Number,
+  maintenanceCharge: {
+    type: Number,
+    default: 0,
+  },
   area: {
     type: Number,
     required: true,
@@ -68,23 +70,41 @@ const propertySchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  balcony: Number,
+  balcony: {
+    type: Number,
+    default: 0,
+  },
+  floorNo: {
+    type: Number,
+    default: 0,
+  },
+  totalFloors: Number,
   bhk: {
     type: String,
     required: true,
     enum: ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK+"],
   },
-  floorNo: Number,
-  totalFloors: Number,
   furnishType: {
     type: String,
     enum: ["furnished", "semi-furnished", "unfurnished"],
     required: true,
   },
   availableFrom: Date,
+  availabilityDate: {
+    type: String,
+    default: "Not specified",
+  },
+  ageOfBuilding: {
+    type: String,
+    default: "Not specified",
+  },
   availableFor: {
     type: String,
     enum: ["Family", "Bachelor Male", "Bachelor Female", "Anyone"],
+  },
+  nearbyPlaces: {
+    type: [String],
+    default: ["Schools", "Hospitals", "Supermarkets", "Parks"],
   },
   location: {
     city: {
@@ -160,7 +180,6 @@ const propertySchema = new mongoose.Schema({
         validate: [(val) => val.length > 0, "At least one slot is required"],
       },
     },
-    // required: false, // <-- landlordSchedule itself is optional
   },
   createdAt: {
     type: Date,
@@ -172,6 +191,7 @@ const propertySchema = new mongoose.Schema({
   },
 });
 
+// Indexes
 propertySchema.index({ "location.city": 1, monthlyRent: 1, bhk: 1 });
 propertySchema.index({ owner: 1, status: 1 });
 propertySchema.index({ "location.coordinates": "2dsphere" });
