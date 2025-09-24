@@ -1,0 +1,720 @@
+{
+	"info": {
+		"_postman_id": "rentgrid-social-login-api",
+		"name": "RentGrid Social Login API - Complete Testing Collection",
+		"description": "Comprehensive social authentication API testing for Google and Facebook OAuth2 integration with RentGrid platform. Includes complete testing workflows, token management, and user account linking.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": {
+			"major": 1,
+			"minor": 0,
+			"patch": 0
+		}
+	},
+	"item": [
+		{
+			"name": "📊 Social Login Status & Configuration",
+			"description": "Check social login availability and configuration",
+			"item": [
+				{
+					"name": "Get Social Login Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "status"]
+						},
+						"description": "Get the status of social login providers and available endpoints. Shows which providers are configured and ready to use."
+					},
+					"response": []
+				},
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the API server is running and healthy before testing social login."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔐 Google OAuth2 Authentication",
+			"description": "Complete Google OAuth2 login flow testing and user management",
+			"item": [
+				{
+					"name": "Step 1: Get Google Auth URL (Testing)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/test/google",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "test", "google"]
+						},
+						"description": "Get the Google OAuth2 authentication URL for testing. Use this URL in your browser to initiate the Google login flow."
+					},
+					"response": []
+				},
+				{
+					"name": "Step 2: Initiate Google Login (Browser Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/google",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "google"]
+						},
+						"description": "⚠️ BROWSER ONLY: This endpoint redirects to Google OAuth. Copy this URL and paste it in your browser to test the complete flow. The browser will handle the OAuth2 redirect flow and return with a token."
+					},
+					"response": []
+				},
+				{
+					"name": "Step 3: Test Google Success Callback",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/test/success?token=test_token_here&userType=tenant&provider=google",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "test", "success"],
+							"query": [
+								{
+									"key": "token",
+									"value": "test_token_here",
+									"description": "JWT token received from OAuth callback"
+								},
+								{
+									"key": "userType",
+									"value": "tenant",
+									"description": "User type: tenant or owner"
+								},
+								{
+									"key": "provider",
+									"value": "google",
+									"description": "OAuth provider: google"
+								}
+							]
+						},
+						"description": "Test the success callback with token parameters. Replace 'test_token_here' with the actual JWT token received from the Google OAuth flow."
+					},
+					"response": []
+				},
+				{
+					"name": "Step 4: Get Current User Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text",
+								"description": "JWT token received from Google OAuth"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Get the current authenticated user's information including linked social accounts. Requires the JWT token from Google OAuth success."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📘 Facebook OAuth2 Authentication",
+			"description": "Complete Facebook OAuth2 login flow testing and user management",
+			"item": [
+				{
+					"name": "Step 1: Get Facebook Auth URL (Testing)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/test/facebook",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "test", "facebook"]
+						},
+						"description": "Get the Facebook OAuth2 authentication URL for testing. Use this URL in your browser to initiate the Facebook login flow."
+					},
+					"response": []
+				},
+				{
+					"name": "Step 2: Initiate Facebook Login (Browser Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/facebook",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "facebook"]
+						},
+						"description": "⚠️ BROWSER ONLY: This endpoint redirects to Facebook OAuth. Copy this URL and paste it in your browser to test the complete flow. The browser will handle the OAuth2 redirect flow and return with a token."
+					},
+					"response": []
+				},
+				{
+					"name": "Step 3: Test Facebook Success Callback",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/test/success?token=test_token_here&userType=tenant&provider=facebook",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "test", "success"],
+							"query": [
+								{
+									"key": "token",
+									"value": "test_token_here",
+									"description": "JWT token received from OAuth callback"
+								},
+								{
+									"key": "userType",
+									"value": "tenant",
+									"description": "User type: tenant or owner"
+								},
+								{
+									"key": "provider",
+									"value": "facebook",
+									"description": "OAuth provider: facebook"
+								}
+							]
+						},
+						"description": "Test the success callback with token parameters. Replace 'test_token_here' with the actual JWT token received from the Facebook OAuth flow."
+					},
+					"response": []
+				},
+				{
+					"name": "Step 4: Get Current User Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text",
+								"description": "JWT token received from Facebook OAuth"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Get the current authenticated user's information including linked social accounts. Requires the JWT token from Facebook OAuth success."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👤 User Account Management",
+			"description": "Manage social accounts, linking, and unlinking",
+			"item": [
+				{
+					"name": "Get User Profile with Social Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Retrieve complete user profile including all linked social accounts (Google, Facebook) with their connection status and last used information."
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Google Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/unlink/google",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "unlink", "google"]
+						},
+						"description": "Unlink the Google account from the current user. Note: Cannot unlink if it's the only authentication method and user has no password set."
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Facebook Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/unlink/facebook",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "unlink", "facebook"]
+						},
+						"description": "Unlink the Facebook account from the current user. Note: Cannot unlink if it's the only authentication method and user has no password set."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔄 Traditional Authentication Integration",
+			"description": "Test integration with existing email/password authentication",
+			"item": [
+				{
+					"name": "Register Tenant (Traditional)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Smith\",\n  \"emailId\": \"john.smith@example.com\",\n  \"password\": \"password123\",\n  \"phonenumber\": \"9876543210\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/tenant/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "tenant", "register"]
+						},
+						"description": "Register a new tenant account using traditional email/password. This account can later be linked with social providers."
+					},
+					"response": []
+				},
+				{
+					"name": "Login Tenant (Traditional)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emailId\": \"john.smith@example.com\",\n  \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/tenant/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "tenant", "login"]
+						},
+						"description": "Login with traditional email/password authentication. Compare the token and user info with social login results."
+					},
+					"response": []
+				},
+				{
+					"name": "Register Owner (Traditional)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Sarah Johnson\",\n  \"emailId\": \"sarah.johnson@example.com\",\n  \"password\": \"password123\",\n  \"phonenumber\": \"8765432109\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/owner/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "owner", "register"]
+						},
+						"description": "Register a new owner account using traditional email/password. This account can later be linked with social providers."
+					},
+					"response": []
+				},
+				{
+					"name": "Login Owner (Traditional)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emailId\": \"sarah.johnson@example.com\",\n  \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/owner/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "owner", "login"]
+						},
+						"description": "Login with traditional email/password authentication. Compare the token and user info with social login results."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "❌ Error Handling & Edge Cases",
+			"description": "Test error scenarios and edge cases for social authentication",
+			"item": [
+				{
+					"name": "Auth Failure Callback",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/failure?error=authentication_failed&message=Test error message",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "failure"],
+							"query": [
+								{
+									"key": "error",
+									"value": "authentication_failed",
+									"description": "Error type"
+								},
+								{
+									"key": "message",
+									"value": "Test error message",
+									"description": "Error message"
+								}
+							]
+						},
+						"description": "Test the authentication failure callback with various error scenarios."
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Invalid Provider",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/unlink/invalid-provider",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "unlink", "invalid-provider"]
+						},
+						"description": "Test error handling when trying to unlink an invalid social provider."
+					},
+					"response": []
+				},
+				{
+					"name": "Access Protected Route Without Token",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Test accessing protected routes without authentication token to verify proper error handling."
+					},
+					"response": []
+				},
+				{
+					"name": "Access Protected Route With Invalid Token",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer invalid_token_here",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Test accessing protected routes with invalid JWT token to verify proper error handling."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🧪 Testing Scenarios & Workflows",
+			"description": "Complete testing workflows and real-world scenarios",
+			"item": [
+				{
+					"name": "Scenario 1: New User Social Signup",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/test/google",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "test", "google"]
+						},
+						"description": "🎯 WORKFLOW: New User Social Signup\n\n1. Get Google auth URL from this request\n2. Open the URL in browser\n3. Complete Google authentication\n4. Get JWT token from success callback\n5. Use token to access /auth/me\n6. Verify new account creation\n\nThis simulates a completely new user signing up via Google."
+					},
+					"response": []
+				},
+				{
+					"name": "Scenario 2: Existing User Account Linking",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Existing User\",\n  \"emailId\": \"existing@gmail.com\",\n  \"password\": \"password123\",\n  \"phonenumber\": \"9876543210\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/tenant/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "tenant", "register"]
+						},
+						"description": "🎯 WORKFLOW: Account Linking\n\n1. Register with this email/password first\n2. Then do Google/Facebook OAuth with SAME email\n3. Social login should link to existing account\n4. Check /auth/me to see both auth methods\n\nThis simulates linking social accounts to existing users."
+					},
+					"response": []
+				},
+				{
+					"name": "Scenario 3: Multi-Provider Linking",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{socialToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "🎯 WORKFLOW: Multi-Provider Account\n\n1. Create account via Google OAuth\n2. Use same email for Facebook OAuth\n3. Check this endpoint to see both providers linked\n4. Test unlinking one provider\n5. Verify can still login with other provider\n\nThis simulates users with multiple social accounts linked."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set dynamic variables",
+					"const timestamp = new Date().getTime();",
+					"pm.globals.set('timestamp', timestamp);",
+					"",
+					"// Generate test data",
+					"const testEmail = `test_${timestamp}@gmail.com`;",
+					"const testUser = `TestUser_${timestamp}`;",
+					"pm.globals.set('testEmail', testEmail);",
+					"pm.globals.set('testUser', testUser);",
+					"",
+					"console.log('Pre-request setup:', {",
+					"    timestamp: timestamp,",
+					"    testEmail: testEmail,",
+					"    testUser: testUser",
+					"});"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test scripts for all requests",
+					"pm.test('Response time is acceptable', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(10000);",
+					"});",
+					"",
+					"pm.test('Response has correct content type', function () {",
+					"    if (pm.response.headers.get('Content-Type')) {",
+					"        pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+					"    }",
+					"});",
+					"",
+					"// Auto-extract tokens from authentication responses",
+					"if (pm.response.code === 200 || pm.response.code === 201) {",
+					"    try {",
+					"        const responseJson = pm.response.json();",
+					"        ",
+					"        // Extract JWT token from traditional auth",
+					"        if (responseJson.data && responseJson.data.token) {",
+					"            pm.globals.set('authToken', responseJson.data.token);",
+					"            console.log('Extracted auth token:', responseJson.data.token);",
+					"        }",
+					"        ",
+					"        // Extract social token from test success endpoint",
+					"        if (pm.request.url.toString().includes('/auth/test/success')) {",
+					"            const urlParams = new URLSearchParams(pm.request.url.query.toString());",
+					"            const token = urlParams.get('token');",
+					"            if (token && token !== 'test_token_here') {",
+					"                pm.globals.set('socialToken', token);",
+					"                console.log('Extracted social token:', token);",
+					"            }",
+					"        }",
+					"        ",
+					"        // Test for successful responses",
+					"        if (responseJson.success !== undefined) {",
+					"            pm.test('Response has success property', function () {",
+					"                pm.expect(responseJson).to.have.property('success');",
+					"            });",
+					"        }",
+					"        ",
+					"        // Test social login status endpoint",
+					"        if (pm.request.url.toString().includes('/auth/status')) {",
+					"            pm.test('Social login status includes providers', function () {",
+					"                pm.expect(responseJson.data).to.have.property('providers');",
+					"                pm.expect(responseJson.data.providers).to.have.property('google');",
+					"                pm.expect(responseJson.data.providers).to.have.property('facebook');",
+					"            });",
+					"        }",
+					"        ",
+					"        // Test user info endpoint",
+					"        if (pm.request.url.toString().includes('/auth/me') && pm.response.code === 200) {",
+					"            pm.test('User info response structure', function () {",
+					"                pm.expect(responseJson.data).to.have.property('user');",
+					"                pm.expect(responseJson.data.user).to.have.property('id');",
+					"                pm.expect(responseJson.data.user).to.have.property('fullName');",
+					"                pm.expect(responseJson.data.user).to.have.property('emailId');",
+					"            });",
+					"        }",
+					"        ",
+					"        // Test traditional auth responses",
+					"        if (pm.request.url.toString().includes('/api/auth/') && responseJson.data && responseJson.data.token) {",
+					"            pm.test('Authentication response includes required fields', function () {",
+					"                pm.expect(responseJson.data).to.have.property('token');",
+					"                pm.expect(responseJson.data).to.have.property('user');",
+					"                pm.expect(responseJson.data.user).to.have.property('userType');",
+					"            });",
+					"        }",
+					"        ",
+					"    } catch (e) {",
+					"        // Non-JSON response is OK for some endpoints",
+					"        console.log('Non-JSON response or parsing error:', e);",
+					"    }",
+					"}",
+					"",
+					"// Test for error responses",
+					"if (pm.response.code >= 400) {",
+					"    try {",
+					"        const responseJson = pm.response.json();",
+					"        pm.test('Error response has proper structure', function () {",
+					"            pm.expect(responseJson).to.have.property('success');",
+					"            pm.expect(responseJson.success).to.be.false;",
+					"            pm.expect(responseJson).to.have.property('message');",
+					"        });",
+					"        console.log('Error Response:', responseJson);",
+					"    } catch (e) {",
+					"        console.log('Error response parsing failed:', e);",
+					"    }",
+					"}",
+					"",
+					"// Log all responses for debugging",
+					"console.log('Response Status:', pm.response.code);",
+					"console.log('Response Time:', pm.response.responseTime + 'ms');"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:7000",
+			"type": "string",
+			"description": "Base URL for the RentGrid API server"
+		},
+		{
+			"key": "socialToken",
+			"value": "your-social-jwt-token-here",
+			"type": "string",
+			"description": "JWT token from social authentication (auto-extracted)"
+		},
+		{
+			"key": "authToken",
+			"value": "your-traditional-auth-token-here",
+			"type": "string",
+			"description": "JWT token from traditional authentication (auto-extracted)"
+		},
+		{
+			"key": "testEmail",
+			"value": "test@example.com",
+			"type": "string",
+			"description": "Dynamic test email (auto-generated)"
+		},
+		{
+			"key": "testUser",
+			"value": "TestUser",
+			"type": "string",
+			"description": "Dynamic test username (auto-generated)"
+		}
+	]
+}

@@ -1,0 +1,39 @@
+# Social Authentication Environment Variables
+# Add these to your .env file for social login functionality
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+GOOGLE_CALLBACK_URL=http://localhost:7000/auth/google/callback
+
+# Facebook OAuth Configuration
+FACEBOOK_CLIENT_ID=your_facebook_app_id_here
+FACEBOOK_CLIENT_SECRET=your_facebook_app_secret_here
+FACEBOOK_CALLBACK_URL=http://localhost:7000/auth/facebook/callback
+
+# Frontend URL (where users will be redirected after OAuth)
+CLIENT_URL=http://localhost:5173
+
+# JWT Configuration
+JWT_SECRET=your_super_secret_jwt_key_here
+JWT_EXPIRES_IN=7d
+
+# Session Configuration
+SESSION_SECRET=your_super_secret_session_key_here
+
+# MongoDB Configuration (if not already set)
+MONGO_URI=mongodb://localhost:27017/rentgrid
+
+# Environment
+NODE_ENV=development
+
+# Port
+PORT=7000
+
+# Instructions:
+# 1. Copy these variables to your .env file
+# 2. Replace the placeholder values with your actual credentials
+# 3. For Google OAuth: Get credentials from Google Cloud Console
+# 4. For Facebook OAuth: Get credentials from Facebook Developers Console
+# 5. Make sure your callback URLs match the ones configured in OAuth apps
+# 6. Update CLIENT_URL to match your frontend application URL

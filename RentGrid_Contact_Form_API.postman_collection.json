@@ -1,0 +1,578 @@
+{
+	"info": {
+		"_postman_id": "rentgrid-contact-api-collection",
+		"name": "RentGrid Contact Form API",
+		"description": "Public Contact Form API for RentGrid - No authentication required. Allows users to submit contact forms and inquiries.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": {
+			"major": 1,
+			"minor": 0,
+			"patch": 0
+		}
+	},
+	"item": [
+		{
+			"name": "📨 Contact Form Submission",
+			"description": "Public API endpoints for contact form submissions - No authentication required",
+			"item": [
+				{
+					"name": "Submit Contact Form",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Afroz\",\n  \"lastName\": \"Malek\",\n  \"email\": \"afroz@example.com\",\n  \"phone\": \"+91-9876543210\",\n  \"message\": \"Hello, I want to know more about your services. I'm looking for a 2BHK apartment in Mumbai and would like to understand the rental process.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Submit a contact form with user inquiries. This is a public API that doesn't require authentication. Perfect for contact us pages, inquiry forms, and customer support requests."
+					},
+					"response": [
+						{
+							"name": "Successful Submission",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"firstName\": \"Afroz\",\n  \"lastName\": \"Malek\",\n  \"email\": \"afroz@example.com\",\n  \"phone\": \"+91-9876543210\",\n  \"message\": \"Hello, I want to know more about your services.\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/contact",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "contact"]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Contact form submitted successfully! We'll get back to you soon.\",\n    \"data\": {\n        \"id\": \"60d5f484f1a2c72d88e4a4b1\",\n        \"firstName\": \"Afroz\",\n        \"lastName\": \"Malek\",\n        \"email\": \"afroz@example.com\",\n        \"submittedAt\": \"2024-01-15T10:30:00.000Z\"\n    }\n}"
+						},
+						{
+							"name": "Validation Error - Missing Fields",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"firstName\": \"Afroz\",\n  \"email\": \"afroz@example.com\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/contact",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "contact"]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": false,\n    \"message\": \"All fields are required: firstName, lastName, email, phone, message\"\n}"
+						},
+						{
+							"name": "Validation Error - Invalid Email",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"firstName\": \"Afroz\",\n  \"lastName\": \"Malek\",\n  \"email\": \"invalid-email\",\n  \"phone\": \"+91-9876543210\",\n  \"message\": \"Hello, I want to know more about your services.\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/contact",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "contact"]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": false,\n    \"message\": \"Validation failed\",\n    \"errors\": [\n        \"Please provide a valid email address\"\n    ]\n}"
+						}
+					]
+				},
+				{
+					"name": "Submit Property Inquiry",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Rajesh\",\n  \"lastName\": \"Kumar\",\n  \"email\": \"rajesh.kumar@gmail.com\",\n  \"phone\": \"+91-9999888777\",\n  \"message\": \"Hi, I'm interested in a 3BHK apartment in Bandra, Mumbai. My budget is around ₹60,000 per month. Can you help me find suitable options? I'm looking for immediate possession and prefer a furnished apartment with parking.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Example of a property-specific inquiry where a user is looking for rental properties with specific requirements."
+					}
+				},
+				{
+					"name": "Submit Partnership Inquiry",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Priya\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"priya.sharma@realestate.com\",\n  \"phone\": \"+91-8888777666\",\n  \"message\": \"Hello, I represent a real estate company and we're interested in partnering with RentGrid. We have 100+ properties in Delhi NCR and would like to list them on your platform. Please contact me to discuss partnership opportunities and commission structures.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Example of a business partnership inquiry from real estate agents or property management companies."
+					}
+				},
+				{
+					"name": "Submit Technical Support Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Amit\",\n  \"lastName\": \"Patel\",\n  \"email\": \"amit.patel@example.com\",\n  \"phone\": \"+91-7777666555\",\n  \"message\": \"I'm facing issues with uploading property images on the owner dashboard. The upload seems to get stuck at 50% and then fails. I've tried with different image formats (JPG, PNG) and sizes. My property ID is RENT123456. Please help resolve this issue as I need to list my property urgently.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Example of a technical support request where users report bugs or issues with the platform."
+					}
+				}
+			]
+		},
+		{
+			"name": "📋 Contact Form Examples",
+			"description": "Various examples of contact form submissions for different use cases",
+			"item": [
+				{
+					"name": "Minimal Valid Submission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"phone\": \"9876543210\",\n  \"message\": \"This is a test message with minimum required characters.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Minimal valid contact form submission with all required fields and minimum message length."
+					}
+				},
+				{
+					"name": "International Phone Format",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Sarah\",\n  \"lastName\": \"Johnson\",\n  \"email\": \"sarah.johnson@international.com\",\n  \"phone\": \"+1-555-123-4567\",\n  \"message\": \"Hello from the USA! I'm an NRI looking for rental properties in Mumbai for my upcoming visit. I would prefer properties in Bandra or Juhu area with good connectivity to the airport.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Contact form submission with international phone number format and NRI inquiry."
+					}
+				},
+				{
+					"name": "Long Message Example",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Vikram\",\n  \"lastName\": \"Singh\",\n  \"email\": \"vikram.singh@corporate.com\",\n  \"phone\": \"+91-9876543210\",\n  \"message\": \"Dear RentGrid Team,\\n\\nI hope this message finds you well. I am reaching out on behalf of my company, TechCorp Solutions, as we are planning to relocate our Mumbai office and need to arrange accommodation for 25+ employees.\\n\\nWe are looking for:\\n1. Furnished 1BHK and 2BHK apartments\\n2. Located in areas like Bandra, Andheri, or Powai\\n3. Budget range: ₹25,000 - ₹45,000 per month\\n4. Immediate possession required\\n5. Preferably in the same building or nearby buildings\\n\\nWe would appreciate if you could:\\n- Provide bulk rental options or corporate packages\\n- Arrange site visits for selected properties\\n- Assist with documentation and agreements\\n\\nPlease let me know the best time to discuss this requirement in detail. I'm available for a call or meeting at your convenience.\\n\\nLooking forward to your response.\\n\\nBest regards,\\nVikram Singh\\nHR Manager, TechCorp Solutions\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Detailed corporate inquiry with comprehensive requirements and professional formatting."
+					}
+				}
+			]
+		},
+		{
+			"name": "❌ Error Testing",
+			"description": "Test various error scenarios and validation cases",
+			"item": [
+				{
+					"name": "Empty Request Body",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Test submission with empty request body to verify proper error handling."
+					}
+				},
+				{
+					"name": "Invalid Email Format",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"invalid.email.format\",\n  \"phone\": \"+91-9876543210\",\n  \"message\": \"Testing invalid email format validation.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Test email validation with invalid email format."
+					}
+				},
+				{
+					"name": "Message Too Short",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"+91-9876543210\",\n  \"message\": \"Hi\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Test message length validation with message shorter than 10 characters."
+					}
+				},
+				{
+					"name": "Invalid Phone Number",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"invalid-phone-123abc\",\n  \"message\": \"Testing phone number validation with invalid format.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Test phone number validation with invalid characters."
+					}
+				},
+				{
+					"name": "Missing Required Fields",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Test\",\n  \"email\": \"test@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contact",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "contact"]
+						},
+						"description": "Test required field validation by omitting lastName, phone, and message."
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set dynamic timestamp for testing",
+					"const timestamp = new Date().getTime();",
+					"pm.globals.set('timestamp', timestamp);",
+					"",
+					"// Generate random test data if needed",
+					"const randomId = Math.floor(Math.random() * 10000);",
+					"pm.globals.set('randomId', randomId);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global tests for all contact form requests",
+					"pm.test('Response time is acceptable', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"pm.test('Response has correct content type', function () {",
+					"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+					"});",
+					"",
+					"pm.test('Response has success property', function () {",
+					"    const responseJson = pm.response.json();",
+					"    pm.expect(responseJson).to.have.property('success');",
+					"});",
+					"",
+					"// Tests for successful submissions (201 status)",
+					"if (pm.response.code === 201) {",
+					"    pm.test('Successful submission returns correct structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.success).to.be.true;",
+					"        pm.expect(responseJson).to.have.property('message');",
+					"        pm.expect(responseJson).to.have.property('data');",
+					"        pm.expect(responseJson.data).to.have.property('id');",
+					"        pm.expect(responseJson.data).to.have.property('firstName');",
+					"        pm.expect(responseJson.data).to.have.property('lastName');",
+					"        pm.expect(responseJson.data).to.have.property('email');",
+					"        pm.expect(responseJson.data).to.have.property('submittedAt');",
+					"    });",
+					"    ",
+					"    pm.test('Success message is appropriate', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.message).to.include('submitted successfully');",
+					"    });",
+					"}",
+					"",
+					"// Tests for validation errors (400 status)",
+					"if (pm.response.code === 400) {",
+					"    pm.test('Validation error returns correct structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.success).to.be.false;",
+					"        pm.expect(responseJson).to.have.property('message');",
+					"    });",
+					"    ",
+					"    pm.test('Error message is informative', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.message).to.be.a('string');",
+					"        pm.expect(responseJson.message.length).to.be.above(5);",
+					"    });",
+					"}",
+					"",
+					"// Tests for server errors (500 status)",
+					"if (pm.response.code === 500) {",
+					"    pm.test('Server error returns error structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.success).to.be.false;",
+					"        pm.expect(responseJson).to.have.property('message');",
+					"    });",
+					"}",
+					"",
+					"// Log response for debugging",
+					"console.log('Contact Form Response:', pm.response.json());"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:7000",
+			"type": "string",
+			"description": "Base URL for the RentGrid API server"
+		}
+	]
+}

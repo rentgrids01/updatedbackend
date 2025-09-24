@@ -25,8 +25,22 @@ const {
   rejectRescheduleRequest,
   createscheduleVisitRequest,
   getVisitRequestStatus
-  
 } = require('../controllers/tenantController');
+
+const {
+  initializeProfileSetup,
+  savePersonalDetails,
+  selectAvatar,
+  uploadProfilePhoto: uploadSetupPhoto,
+  completeProfileDetails,
+  uploadIdDocument,
+  finalizeProfileSetup,
+  getSetupStatus,
+  getDocuments: getProfileDocuments,
+  uploadDocument: uploadProfileDocument,
+  updateDocument,
+  deleteDocument: deleteProfileDocument
+} = require('../controllers/tenantProfileController');
 const { auth, requireUserType } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
@@ -42,6 +56,22 @@ router.post('/profile', createProfile);
 router.put('/profile', updateProfile);
 router.post('/profile/avatar', uploadAvatar);
 router.post('/profile/photo', upload.single('photo'), uploadProfilePhoto);
+
+// Multi-Step Profile Setup Routes
+router.post('/profile/setup/initialize', initializeProfileSetup);
+router.post('/profile/setup/:setupId/personal-details', savePersonalDetails);
+router.post('/profile/setup/:setupId/avatar', selectAvatar);
+router.post('/profile/setup/:setupId/photo', upload.single('uploadedImage'), uploadSetupPhoto);
+router.post('/profile/setup/:setupId/complete-profile', completeProfileDetails);
+router.post('/profile/setup/:setupId/id-document', upload.single('uploadedIdFile'), uploadIdDocument);
+router.post('/profile/setup/:setupId/finalize', finalizeProfileSetup);
+router.get('/profile/setup/:setupId/status', getSetupStatus);
+
+// Document Management Routes
+router.get('/profile/documents', getProfileDocuments);
+router.post('/profile/documents', upload.single('document'), uploadProfileDocument);
+router.put('/profile/documents/:documentId', updateDocument);
+router.delete('/profile/documents/:documentId', deleteProfileDocument);
 
 // Documents
 router.post('/documents', upload.single('file'), uploadDocument);

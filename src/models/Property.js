@@ -22,9 +22,25 @@ const propertySchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  description: {
+  city: {
+    type: String,
+    default: "",
+  },
+   state: {
+    type: String,
+    default: "",
+  },
+   locality: {
+    type: String,
+    default: "",
+  },
+   description: {
     type: String,
     required: true,
+  },
+   fullAddress: {
+    type: String,
+    default: "",
   },
   propertyType: {
     type: String,
@@ -53,6 +69,10 @@ const propertySchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  maintenanceCharges: {
+    type: String,
+    default: "Not specified",
+  },
   area: {
     type: Number,
     required: true,
@@ -71,8 +91,12 @@ const propertySchema = new mongoose.Schema({
     required: true,
   },
   balcony: {
-    type: Number,
-    default: 0,
+    type: String,
+    default: "Not specified",
+  },
+  floor: {
+    type: String,
+    default: "Not specified",
   },
   floorNo: {
     type: Number,
@@ -98,13 +122,21 @@ const propertySchema = new mongoose.Schema({
     type: String,
     default: "Not specified",
   },
+  parking: {
+    type: String,
+    default: "Not Available",
+  },
   availableFor: {
     type: String,
     enum: ["Family", "Bachelor Male", "Bachelor Female", "Anyone"],
   },
+  landlord: {
+    type: String,
+    default: "Property Owner",
+  },
   nearbyPlaces: {
     type: [String],
-    default: ["Schools", "Hospitals", "Supermarkets", "Parks"],
+    default: ["Metro Station - 500m", "Shopping Mall - 1km", "School - 300m", "Hospital - 2km"],
   },
   location: {
     city: {

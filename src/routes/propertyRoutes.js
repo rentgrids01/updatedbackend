@@ -20,15 +20,19 @@ const router = express.Router();
 
 // Public Property Routes (no auth required)
 router.get('/', getAllProperties);
-router.get('/:propertyId', getPropertyById);
-router.get('/:propertyId/similar', getSimilarProperties);
 
-// Owner Property Routes (auth required)
-router.get('/', auth, requireRole(['landlord']), getOwnerProperties);
+// Owner Property Routes (auth required) - Must come before /:propertyId
+router.get('/owner', auth, requireRole(['landlord']), getOwnerProperties);
 router.post('/', auth, requireRole(['landlord']), upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'documents', maxCount: 5 }
 ]), createProperty);
+
+// Public Property Routes with parameters (must come after specific routes)
+router.get('/:propertyId', getPropertyById);
+router.get('/:propertyId/similar', getSimilarProperties);
+
+// Owner Property Management Routes (auth required)
 router.put('/:propertyId', auth, requireRole(['landlord']), updateProperty);
 router.patch('/:propertyId/status', auth, requireRole(['landlord']), updatePropertyStatus);
 router.delete('/:propertyId', auth, requireRole(['landlord']), deleteProperty);

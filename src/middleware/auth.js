@@ -39,7 +39,11 @@ const auth = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    req.user = {
+      userId: decoded.userId,
+      userType: decoded.userType,
+      ...user.toObject()
+    };
     req.userType = decoded.userType;
     next();
   } catch (error) {

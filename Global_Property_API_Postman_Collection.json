@@ -1,0 +1,1064 @@
+{
+	"info": {
+		"_postman_id": "global-property-api-collection",
+		"name": "RentGrid Global Property API Collection",
+		"description": "Comprehensive property API collection with advanced filtering, masking, and global endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "🌍 Public Property APIs",
+			"item": [
+				{
+					"name": "Get All Properties (Basic)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Results per page (max 20)"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Properties (Advanced Filtering)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties?location=Mumbai&minBudget=20000&maxBudget=50000&availability=immediate&preferredTenants=family&propertyType=apartment&furnishing=full&parking=4wheeler&bhk=2&minArea=600&maxArea=2000&propertyAge=lt5&bathrooms=2&floors=1st&showVerified=true&page=1&limit=20&sortBy=monthlyRent&order=asc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "location",
+									"value": "Mumbai",
+									"description": "City/locality name"
+								},
+								{
+									"key": "minBudget",
+									"value": "20000",
+									"description": "Minimum rent"
+								},
+								{
+									"key": "maxBudget",
+									"value": "50000",
+									"description": "Maximum rent"
+								},
+								{
+									"key": "availability",
+									"value": "immediate",
+									"description": "immediate | within_15_days | after_30_days"
+								},
+								{
+									"key": "preferredTenants",
+									"value": "family",
+									"description": "family | bachelor_male | bachelor_female | company | student"
+								},
+								{
+									"key": "propertyType",
+									"value": "apartment",
+									"description": "apartment | villa | studio | independent_house"
+								},
+								{
+									"key": "furnishing",
+									"value": "full",
+									"description": "full | semi | none"
+								},
+								{
+									"key": "parking",
+									"value": "4wheeler",
+									"description": "2wheeler | 4wheeler"
+								},
+								{
+									"key": "bhk",
+									"value": "2",
+									"description": "Number of bedrooms"
+								},
+								{
+									"key": "minArea",
+									"value": "600",
+									"description": "Min built-up area (sq ft)"
+								},
+								{
+									"key": "maxArea",
+									"value": "2000",
+									"description": "Max built-up area (sq ft)"
+								},
+								{
+									"key": "propertyAge",
+									"value": "lt5",
+									"description": "lt1 | lt5 | lt10"
+								},
+								{
+									"key": "bathrooms",
+									"value": "2",
+									"description": "Minimum number of bathrooms"
+								},
+								{
+									"key": "floors",
+									"value": "1st",
+									"description": "ground | 1st | custom"
+								},
+								{
+									"key": "showVerified",
+									"value": "true",
+									"description": "Show only verified properties"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Results per page (max 20)"
+								},
+								{
+									"key": "sortBy",
+									"value": "monthlyRent",
+									"description": "createdAt | monthlyRent | views | area"
+								},
+								{
+									"key": "order",
+									"value": "asc",
+									"description": "asc | desc"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Properties by Multiple Localities",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties?localities[]=Juhu&localities[]=Bandra&localities[]=Andheri&minBudget=25000&maxBudget=60000",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "localities[]",
+									"value": "Juhu",
+									"description": "Multiple localities filter"
+								},
+								{
+									"key": "localities[]",
+									"value": "Bandra",
+									"description": "Multiple localities filter"
+								},
+								{
+									"key": "localities[]",
+									"value": "Andheri",
+									"description": "Multiple localities filter"
+								},
+								{
+									"key": "minBudget",
+									"value": "25000"
+								},
+								{
+									"key": "maxBudget",
+									"value": "60000"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Property by ID (Public)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Similar Properties",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}/similar?limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}",
+								"similar"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "5",
+									"description": "Number of similar properties to return (default: 3)"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🏠 Owner Property Management (Authenticated)",
+			"item": [
+				{
+					"name": "Get Owner Properties",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/owner?page=1&limit=10&status=published",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"owner"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "status",
+									"value": "published",
+									"description": "request | draft | published | rented | sold | inactive"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Property (Full Example)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "title",
+									"value": "Luxury 3BHK Apartment in Prime Location",
+									"type": "text"
+								},
+								{
+									"key": "description",
+									"value": "Spacious 3BHK apartment with modern amenities, excellent connectivity, and premium finishes. Perfect for families looking for comfort and convenience.",
+									"type": "text"
+								},
+								{
+									"key": "city",
+									"value": "Mumbai",
+									"type": "text"
+								},
+								{
+									"key": "state",
+									"value": "Maharashtra",
+									"type": "text"
+								},
+								{
+									"key": "locality",
+									"value": "Bandra West",
+									"type": "text"
+								},
+								{
+									"key": "fullAddress",
+									"value": "A-1001, Skyline Apartments, Linking Road, Bandra West, Mumbai, Maharashtra 400050",
+									"type": "text"
+								},
+								{
+									"key": "landmark",
+									"value": "Near Linking Road Metro Station",
+									"type": "text"
+								},
+								{
+									"key": "zipcode",
+									"value": "400050",
+									"type": "text"
+								},
+								{
+									"key": "latitude",
+									"value": "19.0544",
+									"type": "text"
+								},
+								{
+									"key": "longitude",
+									"value": "72.8301",
+									"type": "text"
+								},
+								{
+									"key": "propertyType",
+									"value": "apartment",
+									"type": "text"
+								},
+								{
+									"key": "listingType",
+									"value": "rent",
+									"type": "text"
+								},
+								{
+									"key": "monthlyRent",
+									"value": "85000",
+									"type": "text"
+								},
+								{
+									"key": "securityDeposit",
+									"value": "170000",
+									"type": "text"
+								},
+								{
+									"key": "maintenanceCharge",
+									"value": "8500",
+									"type": "text"
+								},
+								{
+									"key": "maintenanceCharges",
+									"value": "₹8500/month - Includes water, electricity, gym, pool, and common area maintenance",
+									"type": "text"
+								},
+								{
+									"key": "area",
+									"value": "1800",
+									"type": "text"
+								},
+								{
+									"key": "areaUnit",
+									"value": "sqft",
+									"type": "text"
+								},
+								{
+									"key": "bedroom",
+									"value": "3",
+									"type": "text"
+								},
+								{
+									"key": "bathroom",
+									"value": "3",
+									"type": "text"
+								},
+								{
+									"key": "bhk",
+									"value": "3BHK",
+									"type": "text"
+								},
+								{
+									"key": "furnishType",
+									"value": "furnished",
+									"type": "text"
+								},
+								{
+									"key": "availableFrom",
+									"value": "2024-02-01T00:00:00.000Z",
+									"type": "text"
+								},
+								{
+									"key": "availabilityDate",
+									"value": "Available from February 1, 2024",
+									"type": "text"
+								},
+								{
+									"key": "ageOfBuilding",
+									"value": "3 years old",
+									"type": "text"
+								},
+								{
+									"key": "parking",
+									"value": "2 Covered Car Parking Spaces + 1 Bike Parking",
+									"type": "text"
+								},
+								{
+									"key": "balcony",
+									"value": "3 balconies - Master bedroom, living room, and kitchen utility",
+									"type": "text"
+								},
+								{
+									"key": "floor",
+									"value": "10th Floor out of 25 floors with high-speed elevators",
+									"type": "text"
+								},
+								{
+									"key": "floorNo",
+									"value": "10",
+									"type": "text"
+								},
+								{
+									"key": "totalFloors",
+									"value": "25",
+									"type": "text"
+								},
+								{
+									"key": "availableFor",
+									"value": "Family",
+									"type": "text"
+								},
+								{
+									"key": "landlord",
+									"value": "Mr. Amit Sharma - Experienced property owner",
+									"type": "text"
+								},
+								{
+									"key": "visitingHours",
+									"value": "10:00 AM - 1:00 PM,3:00 PM - 7:00 PM,Weekend: 9:00 AM - 8:00 PM",
+									"type": "text",
+									"description": "Comma separated visiting hours"
+								},
+								{
+									"key": "nearbyPlaces",
+									"value": "Linking Road Metro - 200m,Bandra Station - 1.5km,Phoenix Mall - 800m,Holy Family Hospital - 1km,Lilavati Hospital - 2km,St. Andrew's School - 500m,Bandra Kurla Complex - 3km",
+									"type": "text",
+									"description": "Comma separated nearby places"
+								},
+								{
+									"key": "features",
+									"value": "68d376d52c703a99880a6e1a,68d376d52c703a99880a6e1b,68d376d52c703a99880a6e1d,68d376d52c703a99880a6e1e,68d376d52c703a99880a6e26",
+									"type": "text",
+									"description": "Modular Kitchen, Furnished, AC, Balcony, Walk-in Closet"
+								},
+								{
+									"key": "amenities",
+									"value": "68d376df7ba7a141e694ad8b,68d376df7ba7a141e694ad8c,68d376df7ba7a141e694ad8f,68d376df7ba7a141e694ad93,68d376df7ba7a141e694ad94",
+									"type": "text",
+									"description": "Swimming Pool, Gymnasium, Security, Elevator, Reserved Parking"
+								},
+								{
+									"key": "images",
+									"type": "file",
+									"description": "Property images (JPG/PNG, max 10 files)"
+								},
+								{
+									"key": "documents",
+									"type": "file",
+									"description": "Property documents (PDF, max 5 files)"
+								},
+								{
+									"key": "landlordSchedule",
+									"value": "{\"scheduledDate\": \"2024-02-05T00:00:00.000Z\", \"slots\": [{\"scheduledTime\": \"10:00 AM\"}, {\"scheduledTime\": \"2:00 PM\"}, {\"scheduledTime\": \"4:00 PM\"}, {\"scheduledTime\": \"6:00 PM\"}]}",
+									"type": "text",
+									"description": "JSON string for landlord schedule"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Property",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Premium 3BHK Apartment\",\n  \"description\": \"Recently renovated 3BHK apartment with brand new furnishings\",\n  \"monthlyRent\": 90000,\n  \"maintenanceCharges\": \"₹9000/month - All inclusive premium package\",\n  \"balcony\": \"3 spacious balconies with city and sea view\",\n  \"floor\": \"10th Floor - Premium high floor with excellent views\",\n  \"parking\": \"2 Reserved Car Parking + 2 Bike Parking Spaces\",\n  \"ageOfBuilding\": \"3 years old - Premium construction with modern amenities\",\n  \"availabilityDate\": \"Available from March 1, 2024 - Immediate possession\",\n  \"landlord\": \"Mr. Amit Sharma - Direct owner contact available\",\n  \"visitingHours\": [\"9:00 AM - 12:00 PM\", \"2:00 PM - 7:00 PM\", \"Weekend: 9:00 AM - 9:00 PM\"],\n  \"nearbyPlaces\": [\"Metro Station - 150m\", \"Premium Mall - 600m\", \"Multi-specialty Hospital - 800m\", \"International School - 400m\", \"Business District - 2.5km\", \"Airport - 8km\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Property Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"published\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Property",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📷 Media Management (Authenticated)",
+			"item": [
+				{
+					"name": "Upload Property Images",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images",
+									"type": "file",
+									"description": "Multiple image files (JPG/PNG)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}/images",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}",
+								"images"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Property Image",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"imageUrl\": \"/uploads/property_images/image-filename.jpg\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}/images",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}",
+								"images"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Property Documents",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "documents",
+									"type": "file",
+									"description": "Multiple document files (PDF)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}/documents",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Property Document",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"docUrl\": \"/uploads/property_documents/document-filename.pdf\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/properties/{{propertyId}}/documents",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties",
+								"{{propertyId}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔍 Helper APIs",
+			"item": [
+				{
+					"name": "Get All Features",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/features",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"features"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Amenities",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/amenities",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"amenities"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Filter Examples",
+			"item": [
+				{
+					"name": "Family Properties in Mumbai",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties?location=Mumbai&preferredTenants=family&minBudget=30000&maxBudget=80000&bhk=2&bhk=3&furnishing=full&amenities=swimming_pool,gym&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "location",
+									"value": "Mumbai"
+								},
+								{
+									"key": "preferredTenants",
+									"value": "family"
+								},
+								{
+									"key": "minBudget",
+									"value": "30000"
+								},
+								{
+									"key": "maxBudget",
+									"value": "80000"
+								},
+								{
+									"key": "bhk",
+									"value": "2"
+								},
+								{
+									"key": "bhk",
+									"value": "3"
+								},
+								{
+									"key": "furnishing",
+									"value": "full"
+								},
+								{
+									"key": "amenities",
+									"value": "swimming_pool,gym"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bachelor Properties (Immediate)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties?preferredTenants=bachelor_male&availability=immediate&minBudget=15000&maxBudget=35000&parking=2wheeler&minArea=400&maxArea=800&furnishing=semi&limit=15",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "preferredTenants",
+									"value": "bachelor_male"
+								},
+								{
+									"key": "availability",
+									"value": "immediate"
+								},
+								{
+									"key": "minBudget",
+									"value": "15000"
+								},
+								{
+									"key": "maxBudget",
+									"value": "35000"
+								},
+								{
+									"key": "parking",
+									"value": "2wheeler"
+								},
+								{
+									"key": "minArea",
+									"value": "400"
+								},
+								{
+									"key": "maxArea",
+									"value": "800"
+								},
+								{
+									"key": "furnishing",
+									"value": "semi"
+								},
+								{
+									"key": "limit",
+									"value": "15"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Luxury Properties (New Buildings)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/properties?minBudget=75000&propertyType=villa&propertyAge=lt1&parking=4wheeler&minArea=1500&bathrooms=3&showVerified=true&sortBy=monthlyRent&order=desc&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "minBudget",
+									"value": "75000"
+								},
+								{
+									"key": "propertyType",
+									"value": "villa"
+								},
+								{
+									"key": "propertyAge",
+									"value": "lt1"
+								},
+								{
+									"key": "parking",
+									"value": "4wheeler"
+								},
+								{
+									"key": "minArea",
+									"value": "1500"
+								},
+								{
+									"key": "bathrooms",
+									"value": "3"
+								},
+								{
+									"key": "showVerified",
+									"value": "true"
+								},
+								{
+									"key": "sortBy",
+									"value": "monthlyRent"
+								},
+								{
+									"key": "order",
+									"value": "desc"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Test for successful response",
+					"pm.test('Response status code is 200', function () {",
+					"    pm.expect(pm.response.code).to.equal(200);",
+					"});",
+					"",
+					"// Test response structure",
+					"pm.test('Response has success property', function () {",
+					"    const responseJson = pm.response.json();",
+					"    pm.expect(responseJson).to.have.property('success');",
+					"    pm.expect(responseJson.success).to.be.true;",
+					"});",
+					"",
+					"// Test data structure for property listing",
+					"if (pm.request.url.toString().includes('/api/properties') && !pm.request.url.toString().includes('/similar')) {",
+					"    pm.test('Properties response has correct structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson).to.have.property('data');",
+					"        pm.expect(responseJson.data).to.have.property('properties');",
+					"        pm.expect(responseJson.data).to.have.property('pagination');",
+					"    });",
+					"    ",
+					"    pm.test('Owner data is masked in public APIs', function () {",
+					"        const responseJson = pm.response.json();",
+					"        if (responseJson.data.properties && responseJson.data.properties.length > 0) {",
+					"            const firstProperty = responseJson.data.properties[0];",
+					"            if (firstProperty.owner) {",
+					"                pm.expect(firstProperty.owner).to.have.property('maskName');",
+					"                pm.expect(firstProperty.owner).to.have.property('mobileMasked');",
+					"                pm.expect(firstProperty.owner).to.not.have.property('fullName');",
+					"                pm.expect(firstProperty.owner).to.not.have.property('emailId');",
+					"            }",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"// Test similar properties structure",
+					"if (pm.request.url.toString().includes('/similar')) {",
+					"    pm.test('Similar properties response structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.data).to.have.property('similarProperties');",
+					"        pm.expect(responseJson.data).to.have.property('count');",
+					"        pm.expect(responseJson.data).to.have.property('basedOn');",
+					"    });",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:7000",
+			"type": "string"
+		},
+		{
+			"key": "ownerToken",
+			"value": "your-owner-jwt-token-here",
+			"type": "string",
+			"description": "JWT token for authenticated owner endpoints"
+		},
+		{
+			"key": "propertyId",
+			"value": "property-id-here",
+			"type": "string",
+			"description": "Property ID for specific property operations"
+		}
+	]
+}

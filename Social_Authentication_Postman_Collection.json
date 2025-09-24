@@ -1,0 +1,675 @@
+{
+  "info": {
+    "name": "Social Authentication API",
+    "description": "Complete social login API with Google and Facebook OAuth2 integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Social Auth Status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success property', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Response contains providers info', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.data.providers).to.have.property('google');",
+              "    pm.expect(jsonData.data.providers).to.have.property('facebook');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "status"
+          ]
+        },
+        "description": "Get social login status and available providers"
+      },
+      "response": []
+    },
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Service is healthy', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('healthy');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "health"
+          ]
+        },
+        "description": "Health check for social auth service"
+      },
+      "response": []
+    },
+    {
+      "name": "Test Route",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Routes are working', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('working');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/test",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "test"
+          ]
+        },
+        "description": "Test endpoint to verify routes are working"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Google OAuth URL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains auth URL', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.data.authUrl).to.include('accounts.google.com');",
+              "});",
+              "",
+              "// Store auth URL for manual testing",
+              "const jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.authUrl) {",
+              "    pm.globals.set('google_auth_url', jsonData.data.authUrl);",
+              "    console.log('Google Auth URL:', jsonData.data.authUrl);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/test-google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "test-google"
+          ]
+        },
+        "description": "Get Google OAuth URL for manual testing (development only)"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Facebook OAuth URL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains auth URL', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.data.authUrl).to.include('facebook.com');",
+              "});",
+              "",
+              "// Store auth URL for manual testing",
+              "const jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.authUrl) {",
+              "    pm.globals.set('facebook_auth_url', jsonData.data.authUrl);",
+              "    console.log('Facebook Auth URL:', jsonData.data.authUrl);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/test-facebook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "test-facebook"
+          ]
+        },
+        "description": "Get Facebook OAuth URL for manual testing (development only)"
+      },
+      "response": []
+    },
+    {
+      "name": "Google OAuth Login",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "google"
+          ]
+        },
+        "description": "Initiate Google OAuth login (redirects to Google)"
+      },
+      "response": []
+    },
+    {
+      "name": "Facebook OAuth Login",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/facebook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "facebook"
+          ]
+        },
+        "description": "Initiate Facebook OAuth login (redirects to Facebook)"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Current User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 or 401', function () {",
+              "    pm.expect([200, 401]).to.include(pm.response.code);",
+              "});",
+              "",
+              "if (pm.response.code === 200) {",
+              "    pm.test('Response contains user data', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.data).to.have.property('user');",
+              "        pm.expect(jsonData.data).to.have.property('socialAccounts');",
+              "    });",
+              "} else if (pm.response.code === 401) {",
+              "    pm.test('Unauthorized response format', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.false;",
+              "        pm.expect(jsonData.message).to.include('token');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "me"
+          ]
+        },
+        "description": "Get current authenticated user information"
+      },
+      "response": []
+    },
+    {
+      "name": "Unlink Google Account",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200, 400, 401, or 404', function () {",
+              "    pm.expect([200, 400, 401, 404]).to.include(pm.response.code);",
+              "});",
+              "",
+              "if (pm.response.code === 200) {",
+              "    pm.test('Successfully unlinked', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.message).to.include('unlinked');",
+              "    });",
+              "} else {",
+              "    pm.test('Error response format', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.false;",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/unlink/google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "unlink",
+            "google"
+          ]
+        },
+        "description": "Unlink Google account from user profile"
+      },
+      "response": []
+    },
+    {
+      "name": "Unlink Facebook Account",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200, 400, 401, or 404', function () {",
+              "    pm.expect([200, 400, 401, 404]).to.include(pm.response.code);",
+              "});",
+              "",
+              "if (pm.response.code === 200) {",
+              "    pm.test('Successfully unlinked', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.message).to.include('unlinked');",
+              "    });",
+              "} else {",
+              "    pm.test('Error response format', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.false;",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/unlink/facebook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "unlink",
+            "facebook"
+          ]
+        },
+        "description": "Unlink Facebook account from user profile"
+      },
+      "response": []
+    },
+    {
+      "name": "Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Logout successful', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('Logged out');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/logout",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "logout"
+          ]
+        },
+        "description": "Logout user and clear session"
+      },
+      "response": []
+    },
+    {
+      "name": "Rate Limits Info",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Rate limit info provided', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.data).to.have.property('windowMs');",
+              "    pm.expect(jsonData.data).to.have.property('maxRequests');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/limits",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "limits"
+          ]
+        },
+        "description": "Get rate limiting information"
+      },
+      "response": []
+    },
+    {
+      "name": "Auth Success Callback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Success callback format', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('successful');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/success?token=sample_token&userType=owner&provider=google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "success"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "sample_token"
+            },
+            {
+              "key": "userType",
+              "value": "owner"
+            },
+            {
+              "key": "provider",
+              "value": "google"
+            }
+          ]
+        },
+        "description": "OAuth success callback endpoint (for testing)"
+      },
+      "response": []
+    },
+    {
+      "name": "Auth Failure Callback",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/failure?error=authentication_failed",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "failure"
+          ],
+          "query": [
+            {
+              "key": "error",
+              "value": "authentication_failed"
+            }
+          ]
+        },
+        "description": "OAuth failure callback endpoint"
+      },
+      "response": []
+    },
+    {
+      "name": "Auth Failure JSON",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Error response format', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.false;",
+              "    pm.expect(jsonData).to.have.property('error');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/failure-json?error=authentication_failed&message=Test%20error",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "failure-json"
+          ],
+          "query": [
+            {
+              "key": "error",
+              "value": "authentication_failed"
+            },
+            {
+              "key": "message",
+              "value": "Test error"
+            }
+          ]
+        },
+        "description": "JSON format failure response for API clients"
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set base URL if not already set",
+          "if (!pm.variables.get('base_url')) {",
+          "    pm.variables.set('base_url', 'http://localhost:7000');",
+          "}",
+          "",
+          "// Log current environment",
+          "console.log('Base URL:', pm.variables.get('base_url'));",
+          "console.log('Access Token:', pm.variables.get('access_token') || 'Not set');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-extract tokens from successful auth responses",
+          "if (pm.response.code === 200 && pm.request.url.toString().includes('/auth/success')) {",
+          "    try {",
+          "        const url = new URL(pm.request.url.toString());",
+          "        const token = url.searchParams.get('token');",
+          "        const userType = url.searchParams.get('userType');",
+          "        const provider = url.searchParams.get('provider');",
+          "        ",
+          "        if (token) {",
+          "            pm.globals.set('access_token', token);",
+          "            pm.globals.set('user_type', userType);",
+          "            pm.globals.set('auth_provider', provider);",
+          "            console.log('Token extracted and saved:', token);",
+          "        }",
+          "    } catch (e) {",
+          "        console.log('Could not extract token from URL');",
+          "    }",
+          "}",
+          "",
+          "// Log response time",
+          "console.log('Response time:', pm.response.responseTime + 'ms');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:7000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
