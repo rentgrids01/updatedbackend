@@ -1,0 +1,511 @@
+{
+  "info": {
+    "name": "Clean Social Authentication API",
+    "description": "Essential Google & Facebook OAuth2 endpoints for RentGrid backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "item": [
+    {
+      "name": "1. Service Status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Service is active', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('active');",
+              "});",
+              "",
+              "pm.test('Providers are configured', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.data.providers.google).to.have.property('available');",
+              "    pm.expect(jsonData.data.providers.facebook).to.have.property('available');",
+              "});",
+              "",
+              "// Log provider availability",
+              "const jsonData = pm.response.json();",
+              "console.log('Google available:', jsonData.data.providers.google.available);",
+              "console.log('Facebook available:', jsonData.data.providers.facebook.available);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "status"
+          ]
+        },
+        "description": "Check social authentication service status and provider availability"
+      },
+      "response": []
+    },
+    {
+      "name": "2. Google OAuth Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 302 (redirect)', function () {",
+              "    pm.response.to.have.status(302);",
+              "});",
+              "",
+              "pm.test('Redirects to Google', function () {",
+              "    const location = pm.response.headers.get('Location');",
+              "    pm.expect(location).to.include('accounts.google.com');",
+              "});",
+              "",
+              "// Log redirect URL",
+              "const location = pm.response.headers.get('Location');",
+              "console.log('Google OAuth URL:', location);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "google"
+          ]
+        },
+        "description": "Initiate Google OAuth login (redirects to Google)"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Facebook OAuth Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 302 (redirect)', function () {",
+              "    pm.response.to.have.status(302);",
+              "});",
+              "",
+              "pm.test('Redirects to Facebook', function () {",
+              "    const location = pm.response.headers.get('Location');",
+              "    pm.expect(location).to.include('facebook.com');",
+              "});",
+              "",
+              "// Log redirect URL",
+              "const location = pm.response.headers.get('Location');",
+              "console.log('Facebook OAuth URL:', location);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/facebook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "facebook"
+          ]
+        },
+        "description": "Initiate Facebook OAuth login (redirects to Facebook)"
+      },
+      "response": []
+    },
+    {
+      "name": "4. OAuth Success Callback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Success response format', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('successful');",
+              "    pm.expect(jsonData.data).to.have.property('token');",
+              "    pm.expect(jsonData.data).to.have.property('userType');",
+              "    pm.expect(jsonData.data).to.have.property('provider');",
+              "});",
+              "",
+              "// Extract and store token for future requests",
+              "const jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.token) {",
+              "    pm.globals.set('access_token', jsonData.data.token);",
+              "    pm.globals.set('user_type', jsonData.data.userType);",
+              "    pm.globals.set('auth_provider', jsonData.data.provider);",
+              "    console.log('Token stored:', jsonData.data.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/success?token=sample_jwt_token&userType=tenant&provider=google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "success"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "sample_jwt_token",
+              "description": "JWT token from OAuth success"
+            },
+            {
+              "key": "userType",
+              "value": "tenant",
+              "description": "User type (owner/tenant)"
+            },
+            {
+              "key": "provider",
+              "value": "google",
+              "description": "OAuth provider (google/facebook)"
+            }
+          ]
+        },
+        "description": "OAuth success callback endpoint (simulated with sample data)"
+      },
+      "response": []
+    },
+    {
+      "name": "5. Get Current User Info",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 or 401', function () {",
+              "    pm.expect([200, 401]).to.include(pm.response.code);",
+              "});",
+              "",
+              "if (pm.response.code === 200) {",
+              "    pm.test('User data is returned', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.data).to.have.property('user');",
+              "        pm.expect(jsonData.data).to.have.property('socialAccounts');",
+              "        pm.expect(jsonData.data.user).to.have.property('id');",
+              "        pm.expect(jsonData.data.user).to.have.property('fullName');",
+              "        pm.expect(jsonData.data.user).to.have.property('emailId');",
+              "    });",
+              "} else if (pm.response.code === 401) {",
+              "    pm.test('Unauthorized response', function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.false;",
+              "        pm.expect(jsonData.message).to.include('token');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text",
+            "description": "JWT token from OAuth success"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "me"
+          ]
+        },
+        "description": "Get current authenticated user information (requires valid JWT token)"
+      },
+      "response": []
+    },
+    {
+      "name": "6. Unlink Google Account",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200, 400, 401, or 404', function () {",
+              "    pm.expect([200, 400, 401, 404]).to.include(pm.response.code);",
+              "});",
+              "",
+              "const jsonData = pm.response.json();",
+              "if (pm.response.code === 200) {",
+              "    pm.test('Successfully unlinked', function () {",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.message).to.include('unlinked');",
+              "    });",
+              "} else {",
+              "    pm.test('Error response format', function () {",
+              "        pm.expect(jsonData.success).to.be.false;",
+              "        pm.expect(jsonData).to.have.property('message');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text",
+            "description": "JWT token from OAuth success"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/unlink/google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "unlink",
+            "google"
+          ]
+        },
+        "description": "Unlink Google account from user profile (requires valid JWT token)"
+      },
+      "response": []
+    },
+    {
+      "name": "7. Unlink Facebook Account",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200, 400, 401, or 404', function () {",
+              "    pm.expect([200, 400, 401, 404]).to.include(pm.response.code);",
+              "});",
+              "",
+              "const jsonData = pm.response.json();",
+              "if (pm.response.code === 200) {",
+              "    pm.test('Successfully unlinked', function () {",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.message).to.include('unlinked');",
+              "    });",
+              "} else {",
+              "    pm.test('Error response format', function () {",
+              "        pm.expect(jsonData.success).to.be.false;",
+              "        pm.expect(jsonData).to.have.property('message');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text",
+            "description": "JWT token from OAuth success"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/unlink/facebook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "unlink",
+            "facebook"
+          ]
+        },
+        "description": "Unlink Facebook account from user profile (requires valid JWT token)"
+      },
+      "response": []
+    },
+    {
+      "name": "8. Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Logout successful', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.include('successful');",
+              "});",
+              "",
+              "// Clear stored tokens after logout",
+              "pm.globals.unset('access_token');",
+              "pm.globals.unset('user_type');",
+              "pm.globals.unset('auth_provider');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/logout",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "logout"
+          ]
+        },
+        "description": "Logout user and clear session"
+      },
+      "response": []
+    },
+    {
+      "name": "9. OAuth Failure Callback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Failure callback works', function () {",
+              "    // This endpoint redirects to frontend, so we expect a redirect",
+              "    pm.expect([200, 302]).to.include(pm.response.code);",
+              "});",
+              "",
+              "if (pm.response.code === 302) {",
+              "    pm.test('Redirects to frontend failure page', function () {",
+              "        const location = pm.response.headers.get('Location');",
+              "        pm.expect(location).to.include('failure');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/failure?error=authentication_failed",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "failure"
+          ],
+          "query": [
+            {
+              "key": "error",
+              "value": "authentication_failed"
+            }
+          ]
+        },
+        "description": "OAuth failure callback endpoint"
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set base URL if not configured",
+          "if (!pm.variables.get('base_url')) {",
+          "    pm.variables.set('base_url', 'http://localhost:7000');",
+          "}",
+          "",
+          "// Log current configuration",
+          "console.log('=== REQUEST INFO ===');",
+          "console.log('Base URL:', pm.variables.get('base_url'));",
+          "console.log('Access Token:', pm.globals.get('access_token') ? 'Set' : 'Not set');",
+          "console.log('User Type:', pm.globals.get('user_type') || 'Not set');",
+          "console.log('Auth Provider:', pm.globals.get('auth_provider') || 'Not set');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Log response details",
+          "console.log('=== RESPONSE INFO ===');",
+          "console.log('Status:', pm.response.code, pm.response.status);",
+          "console.log('Response Time:', pm.response.responseTime + 'ms');",
+          "",
+          "// Log any errors",
+          "if (pm.response.code >= 400) {",
+          "    try {",
+          "        const jsonData = pm.response.json();",
+          "        console.log('Error:', jsonData.message);",
+          "    } catch (e) {",
+          "        console.log('Error parsing response JSON');",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:7000",
+      "type": "string",
+      "description": "Backend server base URL"
+    }
+  ]
+}

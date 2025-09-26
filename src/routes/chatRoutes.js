@@ -17,7 +17,7 @@ router.use(auth);
 
 router.get('/', getAllChats);
 router.post('/access', accessChat);
-router.post('/group', createGroupChat);
+router.post('/group', createGroupChat); 
 router.get('/search', searchChats);
 router.get('/unread', getChatsWithUnread);
 router.put('/:chatId/read', markChatAsRead);
