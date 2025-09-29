@@ -78,6 +78,18 @@ const tenantSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  userType: {
+    type: String,
+    default: "tenant"
+  },
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
+  },
   updatedAt: {
     type: Date,
     default: Date.now,

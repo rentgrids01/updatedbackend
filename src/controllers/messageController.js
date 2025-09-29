@@ -1,6 +1,43 @@
-const Message = require('../models/Message');
-const Chat = require('../models/Chat');
-// const { uploadToCloudinary } = require('../utils/cloudinary');
+const mongoose = require('mongoose');
+
+// Get models that were defined in chatController
+let Chat, Message;
+try {
+  Chat = mongoose.model('Chat');
+  Message = mongoose.model('Message');
+} catch (error) {
+  // If models don't exist, create them inline
+  const chatSchema = new mongoose.Schema({
+    participants: [{ type: mongoose.Schema.Types.ObjectId, required: true }],
+    isGroupChat: { type: Boolean, default: false },
+    chatName: String,
+    lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
+    lastActivity: { type: Date, default: Date.now },
+    unreadCount: [{ user: mongoose.Schema.Types.ObjectId, count: { type: Number, default: 0 } }],
+    mutedBy: [{ user: mongoose.Schema.Types.ObjectId, mutedUntil: Date }],
+    archivedBy: [mongoose.Schema.Types.ObjectId]
+  }, { timestamps: true });
+
+  const messageSchema = new mongoose.Schema({
+    chat: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
+    sender: { type: mongoose.Schema.Types.ObjectId, required: true },
+    messageType: { type: String, enum: ['text', 'image', 'location', 'document', 'video', 'audio'], default: 'text' },
+    content: String,
+    imageUrl: String, documentUrl: String, videoUrl: String, audioUrl: String,
+    fileName: String, fileSize: Number, fileMimeType: String,
+    location: { latitude: Number, longitude: Number, address: String },
+    readBy: [{ user: mongoose.Schema.Types.ObjectId, readAt: { type: Date, default: Date.now } }],
+    isEdited: { type: Boolean, default: false },
+    originalContent: String,
+    forwardedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
+    isDeleted: { type: Boolean, default: false }
+  }, { timestamps: true });
+
+  Chat = mongoose.model('Chat', chatSchema);
+  Message = mongoose.model('Message', messageSchema);
+}
+
+// const { uploadToCloudinary } = require("../utils/cloudinary");
 
 // Send Text Message
 const sendMessage = async (req, res) => {
@@ -10,7 +47,7 @@ const sendMessage = async (req, res) => {
     if (!content || !chatId) {
       return res.status(400).json({
         success: false,
-        message: 'Content and chat ID are required'
+        message: "Content and chat ID are required"
       });
     }
 
@@ -18,21 +55,21 @@ const sendMessage = async (req, res) => {
     if (!chat) {
       return res.status(404).json({
         success: false,
-        message: 'Chat not found'
+        message: "Chat not found"
       });
     }
 
     if (!chat.participants.includes(req.user._id)) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized"
       });
     }
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
-      messageType: 'text',
+      messageType: "text",
       content
     });
 
@@ -61,10 +98,10 @@ const sendMessage = async (req, res) => {
     await chat.save();
 
     const populatedMessage = await Message.findById(message._id)
-      .populate('sender', 'fullName profilePhoto');
+      .populate("sender", "fullName profilePhoto");
 
     // Emit socket event
-    req.app.get('io').to(chatId).emit('newMessage', populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
 
     res.status(201).json({
       success: true,
@@ -88,14 +125,14 @@ const getMessages = async (req, res) => {
     if (!chat) {
       return res.status(404).json({
         success: false,
-        message: 'Chat not found'
+        message: "Chat not found"
       });
     }
 
     if (!chat.participants.includes(req.user._id)) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized"
       });
     }
 
@@ -103,7 +140,7 @@ const getMessages = async (req, res) => {
       chat: chatId,
       isDeleted: false
     })
-      .populate('sender', 'fullName profilePhoto')
+      .populate("sender", "fullName profilePhoto")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -140,7 +177,7 @@ const sendPhotoMessage = async (req, res) => {
     if (!chatId || !req.file) {
       return res.status(400).json({
         success: false,
-        message: 'Chat ID and image are required'
+        message: "Chat ID and image are required"
       });
     }
 
@@ -148,40 +185,65 @@ const sendPhotoMessage = async (req, res) => {
     if (!chat) {
       return res.status(404).json({
         success: false,
-        message: 'Chat not found'
+        message: "Chat not found"
       });
     }
 
     if (!chat.participants.includes(req.user._id)) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized"
       });
     }
 
     // const result = await uploadToCloudinary(
     //   req.file.buffer,
-    //   'chat_images',
-    //   'image'
+    //   "chat_images",
+    //   "image"
     // );
+
+    // For demonstration, assume result.secure_url exists
+    const result = { secure_url: `/uploads/chat_images/${Date.now()}-${req.file.originalname}` };
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
-      messageType: 'image',
-      imageUrl: result.secure_url
+      messageType: "image",
+      imageUrl: result.secure_url,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileMimeType: req.file.mimetype
     });
 
     // Update chat
     chat.lastMessage = message._id;
     chat.lastActivity = new Date();
+
+    // Update unread count for other participants
+    chat.participants.forEach(participantId => {
+      if (participantId.toString() !== req.user._id.toString()) {
+        const unreadIndex = chat.unreadCount.findIndex(
+          uc => uc.user.toString() === participantId.toString()
+        );
+
+        if (unreadIndex !== -1) {
+          chat.unreadCount[unreadIndex].count += 1;
+        } else {
+          chat.unreadCount.push({
+            user: participantId,
+            count: 1
+          });
+        }
+      }
+    });
+
     await chat.save();
 
     const populatedMessage = await Message.findById(message._id)
-      .populate('sender', 'fullName profilePhoto');
+      .populate("sender", "fullName profilePhoto");
 
     // Emit socket event
-    req.app.get('io').to(chatId).emit('newMessage', populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
 
     res.status(201).json({
       success: true,
@@ -203,7 +265,7 @@ const sendLocationMessage = async (req, res) => {
     if (!chatId || lat === undefined || lng === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Chat ID, latitude, and longitude are required'
+        message: "Chat ID, latitude, and longitude are required"
       });
     }
 
@@ -211,38 +273,454 @@ const sendLocationMessage = async (req, res) => {
     if (!chat) {
       return res.status(404).json({
         success: false,
-        message: 'Chat not found'
+        message: "Chat not found"
       });
     }
 
     if (!chat.participants.includes(req.user._id)) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized"
       });
     }
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
-      messageType: 'location',
+      messageType: "location",
       location: {
         latitude: lat,
         longitude: lng,
-        address: address || ''
+        address: address || ""
       }
     });
 
     // Update chat
     chat.lastMessage = message._id;
     chat.lastActivity = new Date();
+
+    // Update unread count for other participants
+    chat.participants.forEach(participantId => {
+      if (participantId.toString() !== req.user._id.toString()) {
+        const unreadIndex = chat.unreadCount.findIndex(
+          uc => uc.user.toString() === participantId.toString()
+        );
+
+        if (unreadIndex !== -1) {
+          chat.unreadCount[unreadIndex].count += 1;
+        } else {
+          chat.unreadCount.push({
+            user: participantId,
+            count: 1
+          });
+        }
+      }
+    });
+
     await chat.save();
 
     const populatedMessage = await Message.findById(message._id)
-      .populate('sender', 'fullName profilePhoto');
+      .populate("sender", "fullName profilePhoto");
 
     // Emit socket event
-    req.app.get('io').to(chatId).emit('newMessage', populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+
+    res.status(201).json({
+      success: true,
+      data: populatedMessage
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Send Video Message
+const sendVideoMessage = async (req, res) => {
+  try {
+    const { chatId } = req.body;
+
+    if (!chatId || !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Chat ID and video are required"
+      });
+    }
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    // For demonstration, assume result.secure_url exists
+    const result = { secure_url: `/uploads/chat_videos/${Date.now()}-${req.file.originalname}` };
+
+    const message = await Message.create({
+      chat: chatId,
+      sender: req.user._id,
+      messageType: "video",
+      videoUrl: result.secure_url,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileMimeType: req.file.mimetype
+    });
+
+    // Update chat
+    chat.lastMessage = message._id;
+    chat.lastActivity = new Date();
+
+    // Update unread count for other participants
+    chat.participants.forEach(participantId => {
+      if (participantId.toString() !== req.user._id.toString()) {
+        const unreadIndex = chat.unreadCount.findIndex(
+          uc => uc.user.toString() === participantId.toString()
+        );
+
+        if (unreadIndex !== -1) {
+          chat.unreadCount[unreadIndex].count += 1;
+        } else {
+          chat.unreadCount.push({
+            user: participantId,
+            count: 1
+          });
+        }
+      }
+    });
+
+    await chat.save();
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "fullName profilePhoto");
+
+    // Emit socket event
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+
+    res.status(201).json({
+      success: true,
+      data: populatedMessage
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Send Document Message
+const sendDocumentMessage = async (req, res) => {
+  try {
+    const { chatId } = req.body;
+
+    if (!chatId || !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Chat ID and document are required"
+      });
+    }
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    // For demonstration, assume result.secure_url exists
+    const result = { secure_url: `/uploads/chat_documents/${Date.now()}-${req.file.originalname}` };
+
+    const message = await Message.create({
+      chat: chatId,
+      sender: req.user._id,
+      messageType: "document",
+      documentUrl: result.secure_url,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileMimeType: req.file.mimetype
+    });
+
+    // Update chat
+    chat.lastMessage = message._id;
+    chat.lastActivity = new Date();
+
+    // Update unread count for other participants
+    chat.participants.forEach(participantId => {
+      if (participantId.toString() !== req.user._id.toString()) {
+        const unreadIndex = chat.unreadCount.findIndex(
+          uc => uc.user.toString() === participantId.toString()
+        );
+
+        if (unreadIndex !== -1) {
+          chat.unreadCount[unreadIndex].count += 1;
+        } else {
+          chat.unreadCount.push({
+            user: participantId,
+            count: 1
+          });
+        }
+      }
+    });
+
+    await chat.save();
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "fullName profilePhoto");
+
+    // Emit socket event
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+
+    res.status(201).json({
+      success: true,
+      data: populatedMessage
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Send Audio Message
+const sendAudioMessage = async (req, res) => {
+  try {
+    const { chatId } = req.body;
+
+    if (!chatId || !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Chat ID and audio are required"
+      });
+    }
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    // For demonstration, assume result.secure_url exists
+    const result = { secure_url: `/uploads/chat_audio/${Date.now()}-${req.file.originalname}` };
+
+    const message = await Message.create({
+      chat: chatId,
+      sender: req.user._id,
+      messageType: "audio",
+      audioUrl: result.secure_url,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileMimeType: req.file.mimetype
+    });
+
+    // Update chat
+    chat.lastMessage = message._id;
+    chat.lastActivity = new Date();
+
+    // Update unread count for other participants
+    chat.participants.forEach(participantId => {
+      if (participantId.toString() !== req.user._id.toString()) {
+        const unreadIndex = chat.unreadCount.findIndex(
+          uc => uc.user.toString() === participantId.toString()
+        );
+
+        if (unreadIndex !== -1) {
+          chat.unreadCount[unreadIndex].count += 1;
+        } else {
+          chat.unreadCount.push({
+            user: participantId,
+            count: 1
+          });
+        }
+      }
+    });
+
+    await chat.save();
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "fullName profilePhoto");
+
+    // Emit socket event
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+
+    res.status(201).json({
+      success: true,
+      data: populatedMessage
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Edit Message
+const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        message: "Content is required for editing"
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found"
+      });
+    }
+
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to edit this message"
+      });
+    }
+
+    // Only text messages can be edited
+    if (message.messageType !== "text") {
+      return res.status(400).json({
+        success: false,
+        message: "Only text messages can be edited"
+      });
+    }
+
+    // Save original content before editing
+    if (!message.isEdited) {
+      message.originalContent = message.content;
+    }
+
+    message.content = content;
+    message.isEdited = true;
+    await message.save();
+
+    const updatedMessage = await Message.findById(messageId)
+      .populate("sender", "fullName profilePhoto");
+
+    // Emit socket event
+    req.app.get("io").to(message.chat.toString()).emit("messageEdited", updatedMessage);
+
+    res.json({
+      success: true,
+      data: updatedMessage
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Forward Message
+const forwardMessage = async (req, res) => {
+  try {
+    const { messageId, chatId } = req.params;
+
+    const sourceMessage = await Message.findById(messageId);
+    if (!sourceMessage || sourceMessage.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found"
+      });
+    }
+
+    const targetChat = await Chat.findById(chatId);
+    if (!targetChat) {
+      return res.status(404).json({
+        success: false,
+        message: "Target chat not found"
+      });
+    }
+
+    if (!targetChat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to forward to this chat"
+      });
+    }
+
+    // Create a new message in the target chat with the same content
+    const newMessage = await Message.create({
+      chat: chatId,
+      sender: req.user._id,
+      messageType: sourceMessage.messageType,
+      content: sourceMessage.content,
+      imageUrl: sourceMessage.imageUrl,
+      videoUrl: sourceMessage.videoUrl,
+      audioUrl: sourceMessage.audioUrl,
+      documentUrl: sourceMessage.documentUrl,
+      location: sourceMessage.location,
+      fileName: sourceMessage.fileName,
+      fileSize: sourceMessage.fileSize,
+      fileMimeType: sourceMessage.fileMimeType,
+      forwardedFrom: messageId
+    });
+
+    // Update target chat
+    targetChat.lastMessage = newMessage._id;
+    targetChat.lastActivity = new Date();
+
+    // Update unread count for other participants
+    targetChat.participants.forEach(participantId => {
+      if (participantId.toString() !== req.user._id.toString()) {
+        const unreadIndex = targetChat.unreadCount.findIndex(
+          uc => uc.user.toString() === participantId.toString()
+        );
+
+        if (unreadIndex !== -1) {
+          targetChat.unreadCount[unreadIndex].count += 1;
+        } else {
+          targetChat.unreadCount.push({
+            user: participantId,
+            count: 1
+          });
+        }
+      }
+    });
+
+    await targetChat.save();
+
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate("sender", "fullName profilePhoto");
+
+    // Emit socket event
+    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
 
     res.status(201).json({
       success: true,
@@ -265,14 +743,14 @@ const deleteMessage = async (req, res) => {
     if (!message) {
       return res.status(404).json({
         success: false,
-        message: 'Message not found'
+        message: "Message not found"
       });
     }
 
     if (message.sender.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized"
       });
     }
 
@@ -280,11 +758,68 @@ const deleteMessage = async (req, res) => {
     await message.save();
 
     // Emit socket event
-    req.app.get('io').to(message.chat.toString()).emit('messageDeleted', messageId);
+    req.app.get("io").to(message.chat.toString()).emit("messageDeleted", messageId);
 
     res.json({
       success: true,
-      message: 'Message deleted successfully'
+      message: "Message deleted successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Delete Media/File (but keep the message)
+const deleteMediaFile = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found"
+      });
+    }
+
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (!["image", "video", "audio", "document"].includes(message.messageType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Message does not contain media to delete"
+      });
+    }
+
+    // Clear the media URL but keep message entry
+    if (message.messageType === "image") {
+      message.imageUrl = null;
+    } else if (message.messageType === "video") {
+      message.videoUrl = null;
+    } else if (message.messageType === "audio") {
+      message.audioUrl = null;
+    } else if (message.messageType === "document") {
+      message.documentUrl = null;
+    }
+
+    message.content = "Media removed";
+    await message.save();
+
+    // Emit socket event
+    req.app.get("io").to(message.chat.toString()).emit("mediaDeleted", messageId);
+
+    res.json({
+      success: true,
+      message: "Media deleted successfully",
+      data: message
     });
   } catch (error) {
     res.status(500).json({
@@ -299,5 +834,11 @@ module.exports = {
   getMessages,
   sendPhotoMessage,
   sendLocationMessage,
-  deleteMessage
+  sendVideoMessage,
+  sendDocumentMessage,
+  sendAudioMessage,
+  editMessage,
+  forwardMessage,
+  deleteMessage,
+  deleteMediaFile
 };

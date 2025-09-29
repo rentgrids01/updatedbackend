@@ -1,0 +1,825 @@
+{
+  "info": {
+    "name": "RentGrid WhatsApp-like Chat System APIs",
+    "description": "Complete collection of chat, message, and user presence APIs for WhatsApp-like functionality",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:7000/api",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT token from login API"
+    },
+    {
+      "key": "targetUserId",
+      "value": "",
+      "type": "string",
+      "description": "Valid ObjectId of target user (Tenant or Owner)"
+    },
+    {
+      "key": "chatId",
+      "value": "",
+      "type": "string",
+      "description": "Valid ObjectId of a chat"
+    },
+    {
+      "key": "messageId",
+      "value": "",
+      "type": "string",
+      "description": "Valid ObjectId of a message"
+    }
+  ],
+  "item": [
+    {
+      "name": "Chats",
+      "description": "Chat management APIs",
+      "item": [
+        {
+          "name": "Get All Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Access/Create Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat/access",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "access"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Chat Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Group Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Group Name\",\n  \"users\": [\"USER_ID_1\", \"USER_ID_2\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat/group",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "group"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/search?query=search_term",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "search"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "search_term"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chats with Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/unread",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "unread"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Chat as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId", "read"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mute Chat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duration\": 24\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId/mute",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId", "mute"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unmute Chat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId/unmute",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId", "unmute"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Archive Chat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId/archive",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId", "archive"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unarchive Chat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId/unarchive",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId", "unarchive"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Chat",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/:chatId",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", ":chatId"],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "description": "Message APIs for sending, receiving, and managing messages",
+      "item": [
+        {
+          "name": "Send Text Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Hello, this is a text message!\",\n  \"chatId\": \"CHAT_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/:chatId?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", ":chatId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Photo Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/photo",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "photo"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Video Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/video",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "video"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Document Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "document",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/document",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "document"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Audio Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "chatId",
+                  "value": "CHAT_ID_HERE",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/audio",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "audio"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Location Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chatId\": \"CHAT_ID_HERE\",\n  \"lat\": 40.7128,\n  \"lng\": -74.0060,\n  \"address\": \"New York, NY, USA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/location",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "location"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Message",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Edited message content\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/:messageId/edit",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", ":messageId", "edit"],
+              "variable": [
+                {
+                  "key": "messageId",
+                  "value": "MESSAGE_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forward Message",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/:messageId/forward/:chatId",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", ":messageId", "forward", ":chatId"],
+              "variable": [
+                {
+                  "key": "messageId",
+                  "value": "SOURCE_MESSAGE_ID"
+                },
+                {
+                  "key": "chatId",
+                  "value": "TARGET_CHAT_ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Message",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/:messageId",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", ":messageId"],
+              "variable": [
+                {
+                  "key": "messageId",
+                  "value": "MESSAGE_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Media File",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/:messageId/file",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", ":messageId", "file"],
+              "variable": [
+                {
+                  "key": "messageId",
+                  "value": "MESSAGE_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Presence",
+      "description": "User online status, last seen, and typing indicators",
+      "item": [
+        {
+          "name": "Get User Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/:userId/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":userId", "status"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "USER_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Typing Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isTyping\": true,\n  \"chatId\": \"CHAT_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/:userId/typing",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":userId", "typing"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "YOUR_USER_ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Online Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isOnline\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/:userId/online",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":userId", "online"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "YOUR_USER_ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          ""
+        ],
+        "type": "text/javascript"
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          ""
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ]
+}

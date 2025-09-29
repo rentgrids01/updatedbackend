@@ -68,6 +68,18 @@ const ownerSchema = new mongoose.Schema({
     default: true
   },
   lastLogin: Date,
+  userType: {
+    type: String,
+    default: "owner"
+  },
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
+  },
   createdAt: {
     type: Date,
     default: Date.now
