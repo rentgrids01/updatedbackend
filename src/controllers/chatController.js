@@ -161,13 +161,70 @@ const getAllChats = async (req, res) => {
     const chats = await Chat.find({
       participants: req.user._id
     })
-      .populate('participants', 'fullName profilePhoto userType')
       .populate('lastMessage')
       .sort({ lastActivity: -1 });
 
+    // Manually populate participant details from both Tenant and Owner collections
+    const populatedChats = await Promise.all(
+      chats.map(async (chat) => {
+        const chatObj = chat.toObject();
+        
+        // Populate participants
+        const participantDetails = await Promise.all(
+          chatObj.participants.map(async (participantId) => {
+            // Try to find in Tenant collection first
+            let user = await Tenant.findById(participantId).select('fullName phonenumber profilePhoto userType');
+            
+            // If not found in Tenant, try Owner collection
+            if (!user) {
+              user = await Owner.findById(participantId).select('fullName phonenumber profilePhoto userType');
+            }
+            
+            return user ? {
+              _id: participantId,
+              fullName: user.fullName,
+              phonenumber: user.phonenumber,
+              profilePhoto: user.profilePhoto,
+              userType: user.userType
+            } : {
+              _id: participantId,
+              fullName: 'Unknown User',
+              phonenumber: '',
+              profilePhoto: '',
+              userType: 'unknown'
+            };
+          })
+        );
+        
+        // Populate lastMessage sender if exists
+        if (chatObj.lastMessage && chatObj.lastMessage.sender) {
+          let sender = await Tenant.findById(chatObj.lastMessage.sender).select('fullName phonenumber profilePhoto userType');
+          
+          if (!sender) {
+            sender = await Owner.findById(chatObj.lastMessage.sender).select('fullName phonenumber profilePhoto userType');
+          }
+          
+          if (sender) {
+            chatObj.lastMessage.sender = {
+              _id: chatObj.lastMessage.sender,
+              fullName: sender.fullName,
+              phonenumber: sender.phonenumber,
+              profilePhoto: sender.profilePhoto,
+              userType: sender.userType
+            };
+          }
+        }
+        
+        return {
+          ...chatObj,
+          participants: participantDetails
+        };
+      })
+    );
+
     res.json({
       success: true,
-      data: chats
+      data: populatedChats
     });
   } catch (error) {
     console.error('Get all chats error:', error);
