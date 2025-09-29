@@ -464,6 +464,8 @@ const updateVisitRequest = async (req, res) => {
           status: "confirmed",
         });
 
+        
+
         // Remove booked slot safely
         visitRequest.slots = visitRequest.slots.filter(
           (slot) => slot.scheduledTime.trim().toLowerCase() !== normalizedTime
@@ -478,6 +480,8 @@ const updateVisitRequest = async (req, res) => {
           message: "Invalid action",
         });
     }
+
+    await VisitRequest.findByIdAndUpdate(requestId, updateData);
 
     // Return updated visit request
     const updatedRequest = await VisitRequest.findById(requestId);

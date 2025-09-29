@@ -5,6 +5,7 @@ const VisitRequest = require("../models/VisitRequest");
 const TenantProfile = require("../models/TenantProfile");
 const UniversalTenantApplication = require("../models/UniversalTenantApplication");
 const { saveFile } = require("../utils/fileUpload");
+const {calculateProfileScore} = require("../utils/calculateProfileScore");
 const {
   getPredefinedResponse,
   getChatbotResponse,
@@ -38,34 +39,22 @@ const createProfile = async (req, res) => {
   try {
     const {
       fullName,
-      email,
+      // email,
       phone,
       dob,
       gender,
-      preferredTenantType,
-      moveInDate,
-      leaseDuration,
-      petsAllowed,
-      smokingAllowed,
-      languagePreference,
-      agePreference,
+      profilePhoto,
     } = req.body;
 
     const tenant = await Tenant.findByIdAndUpdate(
       req.user._id,
       {
         fullName: fullName || req.user.fullName,
-        emailId: email || req.user.emailId,
+        // emailId: email || req.user.emailId,
         phonenumber: phone || req.user.phonenumber,
         dob,
         gender,
-        preferredTenantType,
-        moveInDate,
-        leaseDuration,
-        petsAllowed,
-        smokingAllowed,
-        languagePreference,
-        agePreference,
+        profilePhoto,
         updatedAt: new Date(),
       },
       { new: true, runValidators: true }
@@ -101,11 +90,16 @@ const updateProfile = async (req, res) => {
         message: "Profile not found",
       });
     }
+    
+    const profileScore = calculateProfileScore(tenant);
+    tenant.isProfileComplete = profileScore === 100;
+    await tenant.save();
 
     res.json({
       success: true,
       message: "Profile updated successfully",
       data: tenant,
+      profileScore,
     });
   } catch (error) {
     res.status(500).json({
@@ -284,6 +278,7 @@ const getDashboardSummary = async (req, res) => {
   try {
     const visitRequests = await VisitRequest.find({ tenant: req.user._id });
     const savedProperties = await SavedProperty.find({ tenant: req.user._id });
+    const profileScore = calculateProfileScore(req.user);
 
     const counters = {
       pendingVerification: req.user.verificationStatus === "pending" ? 1 : 0,
@@ -341,6 +336,7 @@ const getDashboardSummary = async (req, res) => {
           id: req.user._id,
           name: req.user.fullName,
           avatarUrl: req.user.profilePhoto,
+          profileScore: profileScore,
           kyc: {
             status: req.user.verificationStatus,
             lastVerifiedAt: req.user.updatedAt,

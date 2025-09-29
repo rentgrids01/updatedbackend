@@ -10,7 +10,7 @@ const universalTenantApplicationSchema = new mongoose.Schema(
     personalDetails: {
       fullName: String,
       emailId: String,
-      phonenumber: Number,
+      phonenumber: String,
       age: Number,
     },
     workStatus: {
@@ -28,8 +28,7 @@ const universalTenantApplicationSchema = new mongoose.Schema(
       },
       amenities: [String],
       occupants: Number,
-      budgetMin: Number,
-      budgetMax: Number,
+      budget: Number,
       location: String,
       leaseDuration: String,
       moveInDate: Date,
