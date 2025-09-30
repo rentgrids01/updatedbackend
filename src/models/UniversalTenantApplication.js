@@ -49,7 +49,13 @@ const universalTenantApplicationSchema = new mongoose.Schema(
       duration: String,
       landlordContact: String,
       previousAddress: String,
-      documents: [String],
+      rentalHistoryDocs: [
+        {
+          docName: String,
+          docUrl: String,
+          uploadedAt: { type: Date, default: Date.now },
+        },
+      ],
     },
     documents: [
       {
@@ -60,6 +66,7 @@ const universalTenantApplicationSchema = new mongoose.Schema(
     ],
     videoIntroUrl: String,
     isProfileComplete: { type: Boolean, default: false },
+    isCompleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -548,136 +548,136 @@ const getOwnerProperties = async (req, res) => {
 };
 
 // Create Property
-const createProperty = async (req, res) => {
-  try {
-    const propertyData = req.body;
+  const createProperty = async (req, res) => {
+    try {
+      const propertyData = req.body;
 
-    if (req.body.landlordSchedule && typeof req.body.landlordSchedule === "string") {
-      try {
-        req.body.landlordSchedule = JSON.parse(req.body.landlordSchedule);
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid landlordSchedule JSON format",
+      if (req.body.landlordSchedule && typeof req.body.landlordSchedule === "string") {
+        try {
+          req.body.landlordSchedule = JSON.parse(req.body.landlordSchedule);
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid landlordSchedule JSON format",
+          });
+        }
+      }
+
+      // Handle coordinates if provided
+      let coordinates = {};
+      if (propertyData.latitude && propertyData.longitude) {
+        coordinates = {
+          latitude: parseFloat(propertyData.latitude),
+          longitude: parseFloat(propertyData.longitude),
+        };
+      }
+
+      // Set up location object for the nested location field (if still needed for queries)
+      propertyData.location = {
+        city: propertyData.city,
+        state: propertyData.state,
+        locality: propertyData.locality,
+        landmark: propertyData.landmark || "",
+        zipcode: propertyData.zipcode || "",
+        fullAddress: propertyData.fullAddress,
+        coordinates,
+      };
+
+      // Remove the coordinate fields from the main propertyData since they're now in location.coordinates
+      delete propertyData.latitude;
+      delete propertyData.longitude;
+
+      // Handle features and amenities arrays if they come as comma-separated strings
+      if (propertyData.features) {
+        if (typeof propertyData.features === 'string') {
+          propertyData.features = propertyData.features.split(',').map(f => f.trim()).filter(f => f);
+        }
+        // Validate ObjectIds and filter out invalid ones
+        propertyData.features = propertyData.features.filter(id => {
+          if (typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
+            return true;
+          }
+          return false;
         });
       }
-    }
 
-    // Handle coordinates if provided
-    let coordinates = {};
-    if (propertyData.latitude && propertyData.longitude) {
-      coordinates = {
-        latitude: parseFloat(propertyData.latitude),
-        longitude: parseFloat(propertyData.longitude),
-      };
-    }
-
-    // Set up location object for the nested location field (if still needed for queries)
-    propertyData.location = {
-      city: propertyData.city,
-      state: propertyData.state,
-      locality: propertyData.locality,
-      landmark: propertyData.landmark || "",
-      zipcode: propertyData.zipcode || "",
-      fullAddress: propertyData.fullAddress,
-      coordinates,
-    };
-
-    // Remove the coordinate fields from the main propertyData since they're now in location.coordinates
-    delete propertyData.latitude;
-    delete propertyData.longitude;
-
-    // Handle features and amenities arrays if they come as comma-separated strings
-    if (propertyData.features) {
-      if (typeof propertyData.features === 'string') {
-        propertyData.features = propertyData.features.split(',').map(f => f.trim()).filter(f => f);
-      }
-      // Validate ObjectIds and filter out invalid ones
-      propertyData.features = propertyData.features.filter(id => {
-        if (typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
-          return true;
+      if (propertyData.amenities) {
+        if (typeof propertyData.amenities === 'string') {
+          propertyData.amenities = propertyData.amenities.split(',').map(a => a.trim()).filter(a => a);
         }
-        return false;
-      });
-    }
-
-    if (propertyData.amenities) {
-      if (typeof propertyData.amenities === 'string') {
-        propertyData.amenities = propertyData.amenities.split(',').map(a => a.trim()).filter(a => a);
+        // Validate ObjectIds and filter out invalid ones
+        propertyData.amenities = propertyData.amenities.filter(id => {
+          if (typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
+            return true;
+          }
+          return false;
+        });
       }
-      // Validate ObjectIds and filter out invalid ones
-      propertyData.amenities = propertyData.amenities.filter(id => {
-        if (typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
-          return true;
+
+      // Handle nearbyPlaces if they come as comma-separated strings
+      if (typeof propertyData.nearbyPlaces === 'string') {
+        propertyData.nearbyPlaces = propertyData.nearbyPlaces.split(',').map(p => p.trim());
+      }
+
+      propertyData.owner = req.user._id;
+
+      const imageUrls = [];
+      const documentUrls = [];
+
+      if (req.files) {
+        if (req.files.images) {
+          for (const file of req.files.images) {
+            try {
+              const result = await saveFile(file.buffer, "property_images", file.originalname);
+              imageUrls.push(result.url);
+            } catch (error) {
+              console.error("Image upload failed:", error.message);
+            }
+          }
         }
-        return false;
-      });
-    }
 
-    // Handle nearbyPlaces if they come as comma-separated strings
-    if (typeof propertyData.nearbyPlaces === 'string') {
-      propertyData.nearbyPlaces = propertyData.nearbyPlaces.split(',').map(p => p.trim());
-    }
-
-    propertyData.owner = req.user._id;
-
-    const imageUrls = [];
-    const documentUrls = [];
-
-    if (req.files) {
-      if (req.files.images) {
-        for (const file of req.files.images) {
-          try {
-            const result = await saveFile(file.buffer, "property_images", file.originalname);
-            imageUrls.push(result.url);
-          } catch (error) {
-            console.error("Image upload failed:", error.message);
+        if (req.files.documents) {
+          for (const file of req.files.documents) {
+            try {
+              const result = await saveFile(file.buffer, "property_documents", file.originalname);
+              documentUrls.push(result.url);
+            } catch (error) {
+              console.error("Document upload failed:", error.message);
+            }
           }
         }
       }
 
-      if (req.files.documents) {
-        for (const file of req.files.documents) {
-          try {
-            const result = await saveFile(file.buffer, "property_documents", file.originalname);
-            documentUrls.push(result.url);
-          } catch (error) {
-            console.error("Document upload failed:", error.message);
-          }
-        }
-      }
+      propertyData.images = imageUrls;
+      propertyData.documents = documentUrls;
+
+      // Remove tenantCriteria from propertyData before creating property
+      delete propertyData.tenantCriteria;
+
+      const property = await Property.create(propertyData);
+
+      // Populate the created property with features and amenities
+      await property.populate([
+        { path: 'features', select: 'name description icon' },
+        { path: 'amenities', select: 'name description icon' },
+        { path: 'owner', select: 'fullName emailId phonenumber profilePhoto' }
+      ]);
+
+      // Process property data to include full URLs
+      const processedProperty = processPropertyData(property, req);
+
+      res.status(201).json({
+        success: true,
+        message: "Property created successfully",
+        data: processedProperty,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
     }
-
-    propertyData.images = imageUrls;
-    propertyData.documents = documentUrls;
-
-    // Remove tenantCriteria from propertyData before creating property
-    delete propertyData.tenantCriteria;
-
-    const property = await Property.create(propertyData);
-
-    // Populate the created property with features and amenities
-    await property.populate([
-      { path: 'features', select: 'name description icon' },
-      { path: 'amenities', select: 'name description icon' },
-      { path: 'owner', select: 'fullName emailId phonenumber profilePhoto' }
-    ]);
-
-    // Process property data to include full URLs
-    const processedProperty = processPropertyData(property, req);
-
-    res.status(201).json({
-      success: true,
-      message: "Property created successfully",
-      data: processedProperty,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+  };
 
 
 // Update Property
