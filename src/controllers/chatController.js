@@ -713,6 +713,109 @@ const unarchiveChat = async (req, res) => {
   }
 };
 
+// Get Contacts (All possible chat partners with their chat info if exists)
+const getContacts = async (req, res) => {
+  try {
+    // Validate user ID
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
+    // Determine user type and get appropriate contacts
+    const currentUser = await Tenant.findById(req.user._id) || await Owner.findById(req.user._id);
+    
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    let contacts = [];
+    
+    // If current user is tenant, get all owners
+    if (currentUser.userType === 'tenant') {
+      contacts = await Owner.find({}).select('fullName phonenumber profilePhoto userType');
+    } 
+    // If current user is owner, get all tenants
+    else if (currentUser.userType === 'owner') {
+      contacts = await Tenant.find({}).select('fullName phonenumber profilePhoto userType');
+    }
+
+    // For each contact, check if there's an existing chat and get chat details
+    const contactsWithChats = await Promise.all(
+      contacts.map(async (contact) => {
+        const contactObj = contact.toObject();
+        
+        // Find existing chat between current user and this contact
+        const existingChat = await Chat.findOne({
+          participants: { 
+            $all: [req.user._id, contact._id],
+            $size: 2 
+          },
+          isGroupChat: false
+        }).populate('lastMessage');
+
+        if (existingChat) {
+          // Get unread count for current user
+          const unreadEntry = existingChat.unreadCount.find(entry => 
+            entry.user.toString() === req.user._id.toString()
+          );
+          
+          // Populate lastMessage sender details if exists
+          let lastMessageWithSender = existingChat.lastMessage;
+          if (lastMessageWithSender && lastMessageWithSender.sender) {
+            let sender = await Tenant.findById(lastMessageWithSender.sender).select('fullName phonenumber profilePhoto userType');
+            
+            if (!sender) {
+              sender = await Owner.findById(lastMessageWithSender.sender).select('fullName phonenumber profilePhoto userType');
+            }
+            
+            if (sender) {
+              lastMessageWithSender = {
+                ...lastMessageWithSender.toObject(),
+                sender: {
+                  _id: lastMessageWithSender.sender,
+                  fullName: sender.fullName,
+                  phonenumber: sender.phonenumber,
+                  profilePhoto: sender.profilePhoto,
+                  userType: sender.userType
+                }
+              };
+            }
+          }
+
+          contactObj.chat = {
+            _id: existingChat._id,
+            isGroupChat: existingChat.isGroupChat,
+            lastActivity: existingChat.lastActivity,
+            unreadCount: unreadEntry ? unreadEntry.count : 0,
+            lastMessage: lastMessageWithSender
+          };
+        } else {
+          contactObj.chat = null;
+        }
+
+        return contactObj;
+      })
+    );
+
+    res.json({
+      success: true,
+      data: contactsWithChats
+    });
+  } catch (error) {
+    console.error('Get contacts error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllChats,
   getChatDetails,
@@ -725,5 +828,6 @@ module.exports = {
   muteChat,
   unmuteChat,
   archiveChat,
-  unarchiveChat
+  unarchiveChat,
+  getContacts
 };
