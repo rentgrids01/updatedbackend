@@ -1,11 +1,163 @@
-const Chat = require('../models/Chat');
-const Message = require('../models/Message');
+const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
 const Owner = require('../models/Owner');
+
+// Define Chat and Message schemas inline to avoid loading issues
+const chatSchema = new mongoose.Schema({
+  participants: [{
+    type: mongoose.Schema.Types.ObjectId,
+    required: true
+  }],
+  isGroupChat: {
+    type: Boolean,
+    default: false
+  },
+  chatName: String,
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  },
+  lastActivity: {
+    type: Date,
+    default: Date.now
+  },
+  unreadCount: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId
+    },
+    count: {
+      type: Number,
+      default: 0
+    }
+  }],
+  mutedBy: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId
+    },
+    mutedUntil: {
+      type: Date,
+      default: null
+    }
+  }],
+  archivedBy: [{
+    type: mongoose.Schema.Types.ObjectId
+  }]
+}, {
+  timestamps: true
+});
+
+const messageSchema = new mongoose.Schema({
+  chat: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chat',
+    required: true
+  },
+  sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'image', 'location', 'document', 'video', 'audio'],
+    default: 'text'
+  },
+  content: String,
+  imageUrl: String,
+  documentUrl: String,
+  videoUrl: String,
+  audioUrl: String,
+  fileName: String,
+  fileSize: Number,
+  fileMimeType: String,
+  location: {
+    latitude: Number,
+    longitude: Number,
+    address: String
+  },
+  readBy: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId
+    },
+    readAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  isEdited: {
+    type: Boolean,
+    default: false
+  },
+  originalContent: String,
+  forwardedFrom: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  }
+}, {
+  timestamps: true
+});
+
+// Get or create models
+let Chat, Message;
+try {
+  Chat = mongoose.model('Chat');
+} catch (error) {
+  Chat = mongoose.model('Chat', chatSchema);
+}
+
+try {
+  Message = mongoose.model('Message');
+} catch (error) {
+  Message = mongoose.model('Message', messageSchema);
+}
+
+// Test Chat Model (for debugging)
+const testChatModel = async (req, res) => {
+  try {
+    console.log('Testing Chat model...');
+    console.log('Chat model:', Chat);
+    console.log('Chat.find:', typeof Chat.find);
+    
+    // Simple test query
+    const count = await Chat.countDocuments({});
+    console.log('Total chats in database:', count);
+    
+    res.json({
+      success: true,
+      message: 'Chat model is working',
+      data: {
+        modelName: Chat.modelName,
+        totalChats: count,
+        functions: {
+          find: typeof Chat.find,
+          findOne: typeof Chat.findOne,
+          create: typeof Chat.create
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Test chat model error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
 
 // Get All Chats
 const getAllChats = async (req, res) => {
   try {
+    // Validate user ID
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const chats = await Chat.find({
       participants: req.user._id
     })
@@ -18,6 +170,69 @@ const getAllChats = async (req, res) => {
       data: chats
     });
   } catch (error) {
+    console.error('Get all chats error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Get Single Chat Details
+const getChatDetails = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid chat ID format'
+      });
+    }
+
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
+    const chat = await Chat.findById(chatId)
+      .populate('participants', 'fullName profilePhoto userType lastSeen isOnline')
+      .populate('lastMessage');
+
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    if (!chat.participants.find(p => p._id.toString() === req.user._id.toString())) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Check if chat is muted for the current user
+    const mutedInfo = chat.mutedBy.find(m => m.user.toString() === req.user._id.toString());
+    const isMuted = mutedInfo && (!mutedInfo.mutedUntil || mutedInfo.mutedUntil > new Date());
+
+    // Check if chat is archived for the current user
+    const isArchived = chat.archivedBy.includes(req.user._id);
+
+    res.json({
+      success: true,
+      data: {
+        ...chat.toObject(),
+        isMuted,
+        isArchived
+      }
+    });
+  } catch (error) {
+    console.error('Get chat details error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -34,6 +249,21 @@ const accessChat = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'User ID is required'
+      });
+    }
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+    }
+
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
       });
     }
 
@@ -59,6 +289,7 @@ const accessChat = async (req, res) => {
       data: chat
     });
   } catch (error) {
+    console.error('Access chat error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -270,12 +501,172 @@ const deleteChat = async (req, res) => {
   }
 };
 
+// Mute Chat
+const muteChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { duration } = req.body; // duration in hours, null for indefinite
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Remove existing mute entry for this user
+    chat.mutedBy = chat.mutedBy.filter(m => m.user.toString() !== req.user._id.toString());
+
+    // Add new mute entry
+    const muteEntry = {
+      user: req.user._id,
+      mutedUntil: duration ? new Date(Date.now() + duration * 60 * 60 * 1000) : null
+    };
+
+    chat.mutedBy.push(muteEntry);
+    await chat.save();
+
+    res.json({
+      success: true,
+      message: `Chat muted ${duration ? `for ${duration} hours` : 'indefinitely'}`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Unmute Chat
+const unmuteChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Remove mute entry for this user
+    chat.mutedBy = chat.mutedBy.filter(m => m.user.toString() !== req.user._id.toString());
+    await chat.save();
+
+    res.json({
+      success: true,
+      message: 'Chat unmuted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Archive Chat
+const archiveChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Add user to archived list if not already archived
+    if (!chat.archivedBy.includes(req.user._id)) {
+      chat.archivedBy.push(req.user._id);
+      await chat.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Chat archived successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Unarchive Chat
+const unarchiveChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    if (!chat.participants.includes(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Remove user from archived list
+    chat.archivedBy = chat.archivedBy.filter(userId => userId.toString() !== req.user._id.toString());
+    await chat.save();
+
+    res.json({
+      success: true,
+      message: 'Chat unarchived successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllChats,
+  getChatDetails,
   accessChat,
   createGroupChat,
   searchChats,
   getChatsWithUnread,
   markChatAsRead,
-  deleteChat
+  deleteChat,
+  muteChat,
+  unmuteChat,
+  archiveChat,
+  unarchiveChat
 };
