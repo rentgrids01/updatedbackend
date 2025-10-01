@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { saveFile } = require('../utils/fileUpload');
 
 // Get models that were defined in chatController
 let Chat, Message;
@@ -100,12 +101,19 @@ const sendMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "fullName profilePhoto");
 
+    // Add full URLs to response
+    const messageObj = populatedMessage.toObject();
+    if (messageObj.sender && messageObj.sender.profilePhoto) {
+      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    }
+
     // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Text message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -119,7 +127,6 @@ const sendMessage = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
 
     const chat = await Chat.findById(chatId);
     if (!chat) {
@@ -141,24 +148,39 @@ const getMessages = async (req, res) => {
       isDeleted: false
     })
       .populate("sender", "fullName profilePhoto")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .sort({ createdAt: 1 }); // Get all messages sorted by creation time
 
-    const total = await Message.countDocuments({
-      chat: chatId,
-      isDeleted: false
+    // Add full URLs to messages with media
+    const messagesWithUrls = messages.map(message => {
+      const messageObj = message.toObject();
+      
+      // Add full URLs for profile photos
+      if (messageObj.sender && messageObj.sender.profilePhoto) {
+        messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+      }
+      
+      // Add full URLs for media files
+      if (messageObj.imageUrl) {
+        messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${messageObj.imageUrl}`;
+      }
+      if (messageObj.videoUrl) {
+        messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${messageObj.videoUrl}`;
+      }
+      if (messageObj.audioUrl) {
+        messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${messageObj.audioUrl}`;
+      }
+      if (messageObj.documentUrl) {
+        messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
+      }
+      
+      return messageObj;
     });
 
     res.json({
       success: true,
       data: {
-        messages: messages.reverse(),
-        pagination: {
-          current: parseInt(page),
-          total: Math.ceil(total / limit),
-          hasNext: page * limit < total
-        }
+        messages: messagesWithUrls,
+        totalMessages: messages.length
       }
     });
   } catch (error) {
@@ -196,21 +218,19 @@ const sendPhotoMessage = async (req, res) => {
       });
     }
 
-    // const result = await uploadToCloudinary(
-    //   req.file.buffer,
-    //   "chat_images",
-    //   "image"
-    // );
-
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_images/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload image
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_images",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
       messageType: "image",
-      imageUrl: result.secure_url,
-      fileName: req.file.originalname,
+      imageUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -242,12 +262,17 @@ const sendPhotoMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "fullName profilePhoto");
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    // Add full URLs to response
+    const messageObj = populatedMessage.toObject();
+    messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    if (messageObj.sender && messageObj.sender.profilePhoto) {
+      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Photo message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -322,12 +347,19 @@ const sendLocationMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "fullName profilePhoto");
 
+    // Add full URLs to response
+    const messageObj = populatedMessage.toObject();
+    if (messageObj.sender && messageObj.sender.profilePhoto) {
+      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    }
+
     // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Location message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -364,15 +396,19 @@ const sendVideoMessage = async (req, res) => {
       });
     }
 
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_videos/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload video
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_videos",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
       messageType: "video",
-      videoUrl: result.secure_url,
-      fileName: req.file.originalname,
+      videoUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -404,12 +440,20 @@ const sendVideoMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "fullName profilePhoto");
 
+    // Add full URLs to response
+    const messageObj = populatedMessage.toObject();
+    messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    if (messageObj.sender && messageObj.sender.profilePhoto) {
+      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    }
+
     // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Video message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -446,15 +490,19 @@ const sendDocumentMessage = async (req, res) => {
       });
     }
 
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_documents/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload document
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_documents",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
       messageType: "document",
-      documentUrl: result.secure_url,
-      fileName: req.file.originalname,
+      documentUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -486,12 +534,20 @@ const sendDocumentMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "fullName profilePhoto");
 
+    // Add full URLs to response
+    const messageObj = populatedMessage.toObject();
+    messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    if (messageObj.sender && messageObj.sender.profilePhoto) {
+      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    }
+
     // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Document message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -528,15 +584,19 @@ const sendAudioMessage = async (req, res) => {
       });
     }
 
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_audio/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload audio
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_audio",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
       messageType: "audio",
-      audioUrl: result.secure_url,
-      fileName: req.file.originalname,
+      audioUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -568,12 +628,20 @@ const sendAudioMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "fullName profilePhoto");
 
+    // Add full URLs to response
+    const messageObj = populatedMessage.toObject();
+    messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    if (messageObj.sender && messageObj.sender.profilePhoto) {
+      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    }
+
     // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Audio message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({

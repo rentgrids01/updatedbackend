@@ -400,26 +400,17 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/messages/:chatId?page=1&limit=50",
+              "raw": "{{baseUrl}}/messages/:chatId",
               "host": ["{{baseUrl}}"],
               "path": ["messages", ":chatId"],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "50"
-                }
-              ],
               "variable": [
                 {
                   "key": "chatId",
                   "value": "CHAT_ID_HERE"
                 }
               ]
-            }
+            },
+            "description": "Get all messages for a specific chat. Returns all messages with full URLs for media files (images, videos, documents, audio). No pagination - all messages are returned."
           },
           "response": []
         },
