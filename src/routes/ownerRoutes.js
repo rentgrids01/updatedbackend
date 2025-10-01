@@ -7,6 +7,7 @@ const {
   uploadProfilePhoto,
   uploadDocument,
   getDocuments,
+  updateDocument,
   deleteDocument,
   verifyKYC,
   getVisitRequests,
@@ -18,7 +19,16 @@ const {
   getPreferredTenants,
   updatePreferredTenant,
   deletePreferredTenant,
-  getDashboard
+  getDashboard,
+  // Multi-step profile setup
+  initializeProfileSetup,
+  savePersonalDetails,
+  selectAvatar,
+  uploadSetupPhoto,
+  completeProfileDetails,
+  uploadIdDocument,
+  finalizeProfileSetup,
+  getSetupStatus
 } = require("../controllers/ownerController");
 const { auth, requireUserType } = require("../middleware/auth");
 const upload = require("../middleware/upload");
@@ -31,6 +41,16 @@ router.use(requireUserType(["owner"]));
 
 router.get('/dashboard',getDashboard)
 
+// 🚀 Multi-Step Profile Setup Routes
+router.post("/profile/setup/initialize", initializeProfileSetup);
+router.post("/profile/setup/:setupId/personal-details", savePersonalDetails);
+router.post("/profile/setup/:setupId/avatar", selectAvatar);
+router.post("/profile/setup/:setupId/photo", upload.single("uploadedImage"), uploadSetupPhoto);
+router.post("/profile/setup/:setupId/complete-profile", completeProfileDetails);
+router.post("/profile/setup/:setupId/id-document", upload.single("uploadedIdFile"), uploadIdDocument);
+router.post("/profile/setup/:setupId/finalize", finalizeProfileSetup);
+router.get("/profile/setup/:setupId/status", getSetupStatus);
+
 // Profile Routes
 router.get("/profile", getProfile);
 router.post("/profile", createProfile);
@@ -41,6 +61,7 @@ router.post("/profile/photo", upload.single("photo"), uploadProfilePhoto);
 // Documents
 router.post("/documents", upload.single("file"), uploadDocument);
 router.get("/documents", getDocuments);
+router.put("/documents/:id", updateDocument);
 router.delete("/documents/:id", deleteDocument);
 router.patch("/verify", verifyKYC);
 

@@ -1,7 +1,7 @@
 const Owner = require("../models/Owner");
 const Property = require("../models/Property");
 const VisitRequest = require("../models/VisitRequest");
-// const { saveFile } = require('../utils/fileUpload');
+const { saveFile } = require('../utils/fileUpload');
 // const User = require("../models/User");
 // const LandlordProfile = require("../models/LandlordProfile");
 const Schedule = require("../models/Schedule");
@@ -102,9 +102,26 @@ const getProfile = async (req, res) => {
       });
     }
 
+    // Add full URLs for images
+    const ownerData = owner.toObject();
+    if (ownerData.profilePhoto) {
+      ownerData.profilePhotoUrl = `${req.protocol}://${req.get('host')}${ownerData.profilePhoto}`;
+    }
+    if (ownerData.uploadedImage) {
+      ownerData.uploadedImageUrl = `${req.protocol}://${req.get('host')}${ownerData.uploadedImage}`;
+    }
+    
+    // Add full URLs to documents
+    if (ownerData.documents && ownerData.documents.length > 0) {
+      ownerData.documents = ownerData.documents.map(doc => ({
+        ...doc,
+        documentUrl: doc.documentPath ? `${req.protocol}://${req.get('host')}${doc.documentPath}` : null
+      }));
+    }
+
     res.json({
       success: true,
-      data: owner,
+      data: ownerData,
     });
   } catch (error) {
     res.status(500).json({
@@ -238,10 +255,17 @@ const uploadProfilePhoto = async (req, res) => {
       { new: true }
     ).select("-password");
 
+    const photoUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+
     res.json({
       success: true,
       message: "Profile photo uploaded successfully",
-      data: { profilePhoto: owner.profilePhoto },
+      data: { 
+        profilePhoto: owner.profilePhoto,
+        profilePhotoUrl: photoUrl,
+        filename: result.filename,
+        originalName: result.originalName
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -261,7 +285,7 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    const { docType } = req.body;
+    const { docType, documentName, tags, expiryDate } = req.body;
 
     const result = await saveFile(
       req.file.buffer,
@@ -270,18 +294,26 @@ const uploadDocument = async (req, res) => {
     );
 
     const owner = await Owner.findById(req.user._id);
-    owner.documents.push({
-      docType,
-      docUrl: result.url,
-    });
+    const newDocument = {
+      documentName: documentName || req.file.originalname,
+      documentType: docType || 'OTHER',
+      documentPath: result.url,
+      documentUrl: `${req.protocol}://${req.get('host')}${result.url}`,
+      uploadDate: new Date(),
+      verificationStatus: 'pending',
+      tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
+      expiryDate: expiryDate ? new Date(expiryDate) : null
+    };
+    
+    owner.documents.push(newDocument);
     await owner.save();
 
-    res.json({
+    res.status(201).json({
       success: true,
       message: "Document uploaded successfully",
-      document: {
-        docType,
-        docUrl: result.url,
+      data: {
+        ...newDocument,
+        _id: owner.documents[owner.documents.length - 1]._id
       },
     });
   } catch (error) {
@@ -295,11 +327,46 @@ const uploadDocument = async (req, res) => {
 // Get Documents
 const getDocuments = async (req, res) => {
   try {
+    const { page = 1, limit = 10, documentType, verificationStatus } = req.query;
+    const skip = (page - 1) * limit;
+    
     const owner = await Owner.findById(req.user._id).select("documents");
+    
+    let documents = owner.documents || [];
+    
+    // Apply filters
+    if (documentType) {
+      documents = documents.filter(doc => doc.documentType === documentType);
+    }
+    if (verificationStatus) {
+      documents = documents.filter(doc => doc.verificationStatus === verificationStatus);
+    }
+    
+    // Add full URLs to documents
+    const documentsWithUrls = documents.map(doc => ({
+      ...doc.toObject(),
+      documentUrl: doc.documentPath ? `${req.protocol}://${req.get('host')}${doc.documentPath}` : null
+    }));
+    
+    // Apply pagination
+    const paginatedDocuments = documentsWithUrls.slice(skip, skip + parseInt(limit));
+    
+    const totalDocuments = documents.length;
+    const totalPages = Math.ceil(totalDocuments / limit);
 
     res.json({
       success: true,
-      data: owner.documents,
+      data: {
+        documents: paginatedDocuments,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalDocuments,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        }
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -907,6 +974,495 @@ const deletePreferredTenant = async (req, res) => {
     });
   }
 };
+
+// Update Document Details
+const updateDocument = async (req, res) => {
+  try {
+    const { documentName, documentType, tags, expiryDate } = req.body;
+    const documentId = req.params.id;
+    const ownerId = req.user._id;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner) {
+      return res.status(404).json({
+        success: false,
+        message: "Owner not found",
+      });
+    }
+
+    const documentIndex = owner.documents.findIndex(
+      (doc) => doc._id.toString() === documentId
+    );
+
+    if (documentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Update document details
+    if (documentName) owner.documents[documentIndex].documentName = documentName;
+    if (documentType) owner.documents[documentIndex].documentType = documentType;
+    if (tags) owner.documents[documentIndex].tags = tags.split(',').map(tag => tag.trim());
+    if (expiryDate) owner.documents[documentIndex].expiryDate = new Date(expiryDate);
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "Document updated successfully",
+      data: owner.documents[documentIndex],
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// 🚀 Multi-Step Profile Setup Methods
+
+// Initialize Profile Setup
+const initializeProfileSetup = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { email, fullName, contact } = req.body;
+
+    const setupId = `setup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create or update owner with setup tracking
+    let owner = await Owner.findById(ownerId);
+    if (!owner) {
+      owner = new Owner({
+        userId: ownerId,
+        setupId,
+        setupProgress: {
+          currentStep: 1,
+          totalSteps: 7,
+          completedSteps: [],
+          isComplete: false
+        }
+      });
+    } else {
+      owner.setupId = setupId;
+      owner.setupProgress = {
+        currentStep: 1,
+        totalSteps: 7,
+        completedSteps: [],
+        isComplete: false
+      };
+    }
+
+    if (email) owner.email = email;
+    if (fullName) owner.fullName = fullName;
+    if (contact) owner.phoneNumber = contact;
+
+    await owner.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Profile setup initialized successfully",
+      data: {
+        setupId,
+        progress: owner.setupProgress,
+        currentStep: 1,
+        nextStep: "personal-details"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Save Personal Details
+const savePersonalDetails = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+    const { fullName, email, contact, dateOfBirth, age, propertyType } = req.body;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    // Update personal details
+    if (fullName) owner.fullName = fullName;
+    if (email) owner.email = email;
+    if (contact) owner.phoneNumber = contact;
+    if (dateOfBirth) owner.dateOfBirth = new Date(dateOfBirth);
+    if (age) owner.age = parseInt(age);
+    if (propertyType) owner.propertyType = propertyType;
+
+    // Update progress
+    if (!owner.setupProgress.completedSteps.includes('personal-details')) {
+      owner.setupProgress.completedSteps.push('personal-details');
+    }
+    owner.setupProgress.currentStep = 2;
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "Personal details saved successfully",
+      data: {
+        progress: owner.setupProgress,
+        currentStep: 2,
+        nextStep: "avatar"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Select Avatar
+const selectAvatar = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+    const { selectedAvatar, uploadedImage, isUploading } = req.body;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    // Update avatar selection
+    if (selectedAvatar !== undefined) owner.selectedAvatar = selectedAvatar;
+    if (uploadedImage !== undefined) owner.uploadedImage = uploadedImage;
+    if (isUploading !== undefined) owner.isUploading = isUploading;
+
+    // Update progress
+    if (!owner.setupProgress.completedSteps.includes('avatar')) {
+      owner.setupProgress.completedSteps.push('avatar');
+    }
+    owner.setupProgress.currentStep = 3;
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "Avatar selected successfully",
+      data: {
+        progress: owner.setupProgress,
+        currentStep: 3,
+        nextStep: "photo"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Upload Setup Photo
+const uploadSetupPhoto = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
+    }
+
+    // Process uploaded image using saveFile utility
+    const result = await saveFile(
+      req.file.buffer,
+      "profile_photos",
+      req.file.originalname
+    );
+
+    const photoUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    owner.profilePhoto = result.url;
+    owner.uploadedImage = result.url;
+
+    // Update progress
+    if (!owner.setupProgress.completedSteps.includes('photo')) {
+      owner.setupProgress.completedSteps.push('photo');
+    }
+    owner.setupProgress.currentStep = 4;
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "Profile photo uploaded successfully",
+      data: {
+        photoPath: result.url,
+        photoUrl: photoUrl,
+        filename: result.filename,
+        originalName: result.originalName,
+        progress: owner.setupProgress,
+        currentStep: 4,
+        nextStep: "complete-profile"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Complete Profile Details
+const completeProfileDetails = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+    const { fullName, email, contact, dateOfBirth, age, selectedAvatar, uploadedImage, propertyType } = req.body;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    // Final confirmation of all profile details
+    if (fullName) owner.fullName = fullName;
+    if (email) owner.email = email;
+    if (contact) owner.phoneNumber = contact;
+    if (dateOfBirth) owner.dateOfBirth = new Date(dateOfBirth);
+    if (age) owner.age = parseInt(age);
+    if (selectedAvatar !== undefined) owner.selectedAvatar = selectedAvatar;
+    if (uploadedImage) owner.uploadedImage = uploadedImage;
+    if (propertyType) owner.propertyType = propertyType;
+
+    // Update progress
+    if (!owner.setupProgress.completedSteps.includes('complete-profile')) {
+      owner.setupProgress.completedSteps.push('complete-profile');
+    }
+    owner.setupProgress.currentStep = 5;
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "Profile details completed successfully",
+      data: {
+        progress: owner.setupProgress,
+        currentStep: 5,
+        nextStep: "id-document"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Upload ID Document
+const uploadIdDocument = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+    const { idFileName, documentType } = req.body;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
+    }
+
+    // Process uploaded document using saveFile utility
+    const result = await saveFile(
+      req.file.buffer,
+      "owner_documents",
+      req.file.originalname
+    );
+
+    const documentUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    const newDocument = {
+      documentName: idFileName || req.file.originalname,
+      documentType: documentType || 'OTHER',
+      documentPath: result.url,
+      documentUrl: documentUrl,
+      filename: result.filename,
+      originalName: result.originalName,
+      uploadDate: new Date(),
+      verificationStatus: 'pending',
+      tags: ['identity', 'setup']
+    };
+
+    if (!owner.documents) {
+      owner.documents = [];
+    }
+    owner.documents.push(newDocument);
+
+    // Update progress
+    if (!owner.setupProgress.completedSteps.includes('id-document')) {
+      owner.setupProgress.completedSteps.push('id-document');
+    }
+    owner.setupProgress.currentStep = 6;
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "ID document uploaded successfully",
+      data: {
+        document: {
+          ...newDocument,
+          _id: owner.documents[owner.documents.length - 1]._id
+        },
+        progress: owner.setupProgress,
+        currentStep: 6,
+        nextStep: "finalize"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Finalize Profile Setup
+const finalizeProfileSetup = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+    const { profileComplete } = req.body;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    // Finalize setup
+    if (profileComplete) {
+      owner.setupProgress.completedSteps.push('finalize');
+      owner.setupProgress.currentStep = 7;
+      owner.setupProgress.isComplete = true;
+      owner.profileCompleted = true;
+    }
+
+    await owner.save();
+
+    res.json({
+      success: true,
+      message: "Profile setup finalized successfully",
+      data: {
+        progress: owner.setupProgress,
+        profileComplete: true,
+        setupComplete: true
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get Setup Status
+const getSetupStatus = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { setupId } = req.params;
+
+    const owner = await Owner.findById(ownerId);
+    if (!owner || owner.setupId !== setupId) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid setup session",
+      });
+    }
+
+    const stepMap = {
+      1: 'initialize',
+      2: 'personal-details',
+      3: 'avatar',
+      4: 'photo',
+      5: 'complete-profile',
+      6: 'id-document',
+      7: 'finalize'
+    };
+
+    // Prepare owner data with full URLs
+    const ownerData = {
+      fullName: owner.fullName,
+      email: owner.email,
+      phoneNumber: owner.phoneNumber,
+      profilePhoto: owner.profilePhoto,
+      selectedAvatar: owner.selectedAvatar
+    };
+
+    // Add full URLs for images
+    if (owner.profilePhoto) {
+      ownerData.profilePhotoUrl = `${req.protocol}://${req.get('host')}${owner.profilePhoto}`;
+    }
+    if (owner.uploadedImage) {
+      ownerData.uploadedImageUrl = `${req.protocol}://${req.get('host')}${owner.uploadedImage}`;
+    }
+
+    res.json({
+      success: true,
+      message: "Setup status retrieved successfully",
+      data: {
+        setupId: owner.setupId,
+        progress: owner.setupProgress,
+        currentStep: owner.setupProgress.currentStep,
+        currentStepName: stepMap[owner.setupProgress.currentStep],
+        completedSteps: owner.setupProgress.completedSteps,
+        isComplete: owner.setupProgress.isComplete,
+        owner: ownerData
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   createProfile,
@@ -915,6 +1471,7 @@ module.exports = {
   uploadProfilePhoto,
   uploadDocument,
   getDocuments,
+  updateDocument,
   deleteDocument,
   verifyKYC,
   getVisitRequests,
@@ -927,4 +1484,13 @@ module.exports = {
   rejectRescheduleRequest,
   RescheduleVisit,
   getDashboard,
+  // Multi-step profile setup methods
+  initializeProfileSetup,
+  savePersonalDetails,
+  selectAvatar,
+  uploadSetupPhoto,
+  completeProfileDetails,
+  uploadIdDocument,
+  finalizeProfileSetup,
+  getSetupStatus,
 };
