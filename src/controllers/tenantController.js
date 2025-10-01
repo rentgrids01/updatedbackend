@@ -5,7 +5,7 @@ const VisitRequest = require("../models/VisitRequest");
 const TenantProfile = require("../models/TenantProfile");
 const UniversalTenantApplication = require("../models/UniversalTenantApplication");
 const { saveFile } = require("../utils/fileUpload");
-const {calculateProfileScore} = require("../utils/calculateProfileScore");
+const { calculateProfileScore } = require("../utils/calculateProfileScore");
 const {
   getPredefinedResponse,
   getChatbotResponse,
@@ -90,7 +90,6 @@ const updateProfile = async (req, res) => {
         message: "Profile not found",
       });
     }
-    
     const profileScore = calculateProfileScore(tenant);
     tenant.isProfileComplete = profileScore === 100;
     await tenant.save();
@@ -778,7 +777,8 @@ const createApplication = async (req, res) => {
     if (!tenantProfile.isProfileComplete) {
       return res.status(400).json({
         success: false,
-        message: "Please complete your profile before filling out the application form.",
+        message:
+          "Please complete your profile before filling out the application form.",
       });
     }
 
@@ -803,7 +803,7 @@ const createApplication = async (req, res) => {
         personalDetails,
         workStatus,
       });
-      
+
       await application.save();
 
       tenantProfile.applicationId = application._id;
@@ -819,7 +819,7 @@ const createApplication = async (req, res) => {
       application.personalDetails = personalDetails;
       application.workStatus = workStatus;
       application.updatedAt = new Date();
-      
+
       await application.save();
 
       return res.status(200).json({
@@ -828,7 +828,6 @@ const createApplication = async (req, res) => {
         data: application,
       });
     }
-
   } catch (err) {
     console.error("Error in createApplication:", err);
 
@@ -837,7 +836,7 @@ const createApplication = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: "Application already exists for this tenant.",
-        error: "Duplicate application error"
+        error: "Duplicate application error",
       });
     }
 
@@ -847,12 +846,10 @@ const createApplication = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: err.message
+      error: err.message,
     });
   }
 };
-
-
 
 // Step 2 - Property Preferences, Rental History, Preferences, Documents
 const updateApplicationStep2 = async (req, res) => {
@@ -877,11 +874,113 @@ const updateApplicationStep2 = async (req, res) => {
         message: "Application not found. Please complete step 1 first.",
       });
 
-    if (propertyPreferences)
-      application.propertyPreferences = propertyPreferences;
-    if (rentalHistory) application.rentalHistory = rentalHistory;
-    if (preferences) application.preferences = preferences;
-    if (documents) application.documents = documents;
+    if (propertyPreferences) {
+      if (typeof propertyPreferences === "string") {
+        try {
+          const parsedPrefs = JSON.parse(propertyPreferences);
+          if (parsedPrefs.moveInDate) {
+            parsedPrefs.moveInDate = new Date(parsedPrefs.moveInDate);
+          }
+          application.propertyPreferences = parsedPrefs;
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid propertyPreferences format",
+            error: error.message,
+          });
+        }
+      } else {
+        if (propertyPreferences.moveInDate) {
+          propertyPreferences.moveInDate = new Date(
+            propertyPreferences.moveInDate
+          );
+        }
+        application.propertyPreferences = propertyPreferences;
+      }
+    }
+    if (rentalHistory) {
+      if (typeof rentalHistory === "string") {
+        try {
+          const rentalObj = JSON.parse(rentalHistory);
+          rentalObj.documents = rentalObj.documents || [];
+          application.rentalHistory = rentalObj;
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid rentalHistory format",
+            error: error.message,
+          });
+        }
+      } else {
+        application.rentalHistory = rentalHistory;
+      }
+    }
+
+    // Preferences
+    if (preferences) {
+      if (typeof preferences === "string") {
+        try {
+          application.preferences = JSON.parse(preferences);
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid preferences format",
+            error: error.message,
+          });
+        }
+      } else {
+        application.preferences = preferences;
+      }
+    }
+
+    if (req.files?.documents) {
+      application.documents = application.documents || [];
+      for (const [idx, file] of req.files.documents.entries()) {
+        try {
+          const result = await saveFile(
+            file.buffer,
+            "application_documents",
+            file.originalname
+          );
+          application.documents.push({
+            docName: Array.isArray(req.body.docType)
+              ? req.body.docType[idx]
+              : req.body.docType || "Document",
+            docUrl: result.url,
+            uploadedAt: new Date(),
+          });
+        } catch (error) {
+          console.error("Application document upload failed:", error.message);
+          // Continue with other uploads even if one fails
+        }
+      }
+    }
+
+    if (req.files?.rentalHistoryDocs) {
+      // Ensure rentalHistory object exists
+      application.rentalHistory = application.rentalHistory || {};
+      application.rentalHistory.rentalHistoryDocs =
+        application.rentalHistory.rentalHistoryDocs || [];
+
+      for (const [idx, file] of req.files.rentalHistoryDocs.entries()) {
+        try {
+          const result = await saveFile(
+            file.buffer,
+            "rental_history_documents",
+            file.originalname
+          );
+          application.rentalHistory.rentalHistoryDocs.push({
+            docName: Array.isArray(req.body.rentalDocName)
+              ? req.body.rentalDocName[idx]
+              : req.body.rentalDocName || file.originalname,
+            docUrl: result.url,
+            uploadedAt: new Date(),
+          });
+        } catch (error) {
+          console.error("Rental history doc upload failed:", error.message);
+        }
+      }
+    }
 
     await application.save();
 
@@ -920,7 +1019,63 @@ const updateApplicationStep3 = async (req, res) => {
       });
     }
 
-    application.videoIntroUrl = videoIntroUrl;
+    // Handle video introduction upload
+    if (req.file) {
+      try {
+        // Validate file type (optional)
+        const allowedTypes = [
+          "video/mp4",
+          "video/avi",
+          "video/mov",
+          "video/wmv",
+          "video/webm",
+        ];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid video format. Please upload MP4, AVI, MOV, WMV, or WebM files.",
+          });
+        }
+
+        const result = await saveFile(
+          req.file.buffer,
+          "video_intros",
+          req.file.originalname
+        );
+        application.videoIntroUrl = result.url;
+
+        // Save video metadata
+        application.videoIntroMetadata = {
+          originalName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          uploadedAt: new Date(),
+        };
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload video",
+          error: error.message,
+        });
+      }
+    } else if (req.body.videoIntroUrl) {
+      // Validate URL format (optional)
+      try {
+        new URL(req.body.videoIntroUrl);
+        application.videoIntroUrl = req.body.videoIntroUrl;
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid video URL format.",
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a video file or a valid video URL.",
+      });
+    }
     application.isCompleted = true;
 
     await application.save();

@@ -11,7 +11,8 @@ const {
   muteChat,
   unmuteChat,
   archiveChat,
-  unarchiveChat
+  unarchiveChat,
+  getContacts
 } = require('../controllers/chatController');
 const { auth } = require('../middleware/auth');
 
@@ -22,6 +23,7 @@ router.use(auth);
 
 // Existing routes
 router.get('/', getAllChats);
+router.get('/contacts', getContacts);
 router.post('/access', accessChat);
 router.post('/group', createGroupChat); 
 router.get('/search', searchChats);
