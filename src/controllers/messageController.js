@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const { saveFile } = require('../utils/fileUpload');
+const Tenant = require('../models/Tenant');
+const Owner = require('../models/Owner');
 
 // Get models that were defined in chatController
 let Chat, Message;
@@ -147,39 +149,69 @@ const getMessages = async (req, res) => {
       chat: chatId,
       isDeleted: false
     })
-      .populate("sender", "fullName profilePhoto")
       .sort({ createdAt: 1 }); // Get all messages sorted by creation time
 
-    // Add full URLs to messages with media
-    const messagesWithUrls = messages.map(message => {
-      const messageObj = message.toObject();
-      
-      // Add full URLs for profile photos
-      if (messageObj.sender && messageObj.sender.profilePhoto) {
-        messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
-      }
-      
-      // Add full URLs for media files
-      if (messageObj.imageUrl) {
-        messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${messageObj.imageUrl}`;
-      }
-      if (messageObj.videoUrl) {
-        messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${messageObj.videoUrl}`;
-      }
-      if (messageObj.audioUrl) {
-        messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${messageObj.audioUrl}`;
-      }
-      if (messageObj.documentUrl) {
-        messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
-      }
-      
-      return messageObj;
-    });
+    // Manually populate sender details from both Tenant and Owner collections
+    const messagesWithFullDetails = await Promise.all(
+      messages.map(async (message) => {
+        const messageObj = message.toObject();
+        
+        // Populate sender details
+        if (messageObj.sender) {
+          // Try to find in Tenant collection first
+          let sender = await Tenant.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+          
+          // If not found in Tenant, try Owner collection
+          if (!sender) {
+            sender = await Owner.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+          }
+          
+          if (sender) {
+            messageObj.sender = {
+              _id: messageObj.sender,
+              fullName: sender.fullName,
+              phonenumber: sender.phonenumber,
+              profilePhoto: sender.profilePhoto,
+              userType: sender.userType
+            };
+            
+            // Add full URL for profile photo
+            if (sender.profilePhoto) {
+              messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+            }
+          } else {
+            messageObj.sender = {
+              _id: messageObj.sender,
+              fullName: 'Unknown User',
+              phonenumber: '',
+              profilePhoto: '',
+              userType: 'unknown'
+            };
+          }
+        }
+        
+        // Add full URLs for media files
+        if (messageObj.imageUrl) {
+          messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${messageObj.imageUrl}`;
+        }
+        if (messageObj.videoUrl) {
+          messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${messageObj.videoUrl}`;
+        }
+        if (messageObj.audioUrl) {
+          messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${messageObj.audioUrl}`;
+        }
+        if (messageObj.documentUrl) {
+          messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
+        }
+        
+        return messageObj;
+      })
+    );
 
     res.json({
       success: true,
       data: {
-        messages: messagesWithUrls,
+        messages: messagesWithFullDetails,
         totalMessages: messages.length
       }
     });

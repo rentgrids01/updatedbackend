@@ -750,6 +750,11 @@ const getContacts = async (req, res) => {
       contacts.map(async (contact) => {
         const contactObj = contact.toObject();
         
+        // Add full URL for profile photo
+        if (contactObj.profilePhoto) {
+          contactObj.profilePhotoUrl = `${req.protocol}://${req.get('host')}${contactObj.profilePhoto}`;
+        }
+        
         // Find existing chat between current user and this contact
         const existingChat = await Chat.findOne({
           participants: { 
@@ -785,6 +790,25 @@ const getContacts = async (req, res) => {
                   userType: sender.userType
                 }
               };
+              
+              // Add full URL for sender profile photo
+              if (sender.profilePhoto) {
+                lastMessageWithSender.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+              }
+              
+              // Add full URLs for message media if exists
+              if (lastMessageWithSender.imageUrl) {
+                lastMessageWithSender.imageFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.imageUrl}`;
+              }
+              if (lastMessageWithSender.videoUrl) {
+                lastMessageWithSender.videoFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.videoUrl}`;
+              }
+              if (lastMessageWithSender.audioUrl) {
+                lastMessageWithSender.audioFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.audioUrl}`;
+              }
+              if (lastMessageWithSender.documentUrl) {
+                lastMessageWithSender.documentFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.documentUrl}`;
+              }
             }
           }
 
@@ -795,17 +819,43 @@ const getContacts = async (req, res) => {
             unreadCount: unreadEntry ? unreadEntry.count : 0,
             lastMessage: lastMessageWithSender
           };
+          
+          // Add sortDate for WhatsApp-like sorting (most recent activity first)
+          contactObj.sortDate = existingChat.lastActivity;
         } else {
           contactObj.chat = null;
+          // For contacts without chats, use a very old date so they appear at the bottom
+          contactObj.sortDate = new Date(0);
         }
 
         return contactObj;
       })
     );
 
+    // Sort contacts WhatsApp-style: 
+    // 1. Contacts with existing chats sorted by most recent activity first
+    // 2. Contacts without chats sorted alphabetically at the bottom
+    const sortedContacts = contactsWithChats.sort((a, b) => {
+      // If both have chats or both don't have chats, sort by activity date (most recent first)
+      if ((a.chat && b.chat) || (!a.chat && !b.chat)) {
+        return new Date(b.sortDate) - new Date(a.sortDate);
+      }
+      // Contacts with chats come first
+      if (a.chat && !b.chat) return -1;
+      if (!a.chat && b.chat) return 1;
+      
+      return 0;
+    });
+
+    // Remove the temporary sortDate field
+    const cleanedContacts = sortedContacts.map(contact => {
+      const { sortDate, ...contactWithoutSort } = contact;
+      return contactWithoutSort;
+    });
+
     res.json({
       success: true,
-      data: contactsWithChats
+      data: cleanedContacts
     });
   } catch (error) {
     console.error('Get contacts error:', error);
