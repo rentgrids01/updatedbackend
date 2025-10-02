@@ -3,6 +3,190 @@ const { saveFile } = require('../utils/fileUpload');
 const Tenant = require('../models/Tenant');
 const Owner = require('../models/Owner');
 
+// Helper function to create contact object for a specific user
+const createContactObject = async (userId, chatData, currentUserId, req) => {
+  try {
+    // Get user details from either Tenant or Owner collection
+    let user = await Tenant.findById(userId).select('fullName phonenumber profilePhoto userType');
+    
+    if (!user) {
+      user = await Owner.findById(userId).select('fullName phonenumber profilePhoto userType');
+    }
+    
+    if (!user) {
+      return null;
+    }
+
+    const contactObj = {
+      _id: user._id,
+      fullName: user.fullName,
+      phonenumber: user.phonenumber,
+      profilePhoto: user.profilePhoto,
+      userType: user.userType
+    };
+
+    // Add full URL for profile photo
+    if (user.profilePhoto) {
+      contactObj.profilePhotoUrl = `${req.protocol}://${req.get('host')}${user.profilePhoto}`;
+    }
+
+    // Add chat information
+    if (chatData) {
+      // Get unread count for the current user
+      const unreadEntry = chatData.unreadCount.find(entry => 
+        entry.user.toString() === currentUserId.toString()
+      );
+
+      // Create lastMessage object with sender details
+      let lastMessageWithSender = null;
+      if (chatData.lastMessage) {
+        const lastMessage = chatData.lastMessage.toObject ? chatData.lastMessage.toObject() : chatData.lastMessage;
+        
+        if (lastMessage.sender) {
+          let sender = await Tenant.findById(lastMessage.sender).select('fullName phonenumber profilePhoto userType');
+          
+          if (!sender) {
+            sender = await Owner.findById(lastMessage.sender).select('fullName phonenumber profilePhoto userType');
+          }
+          
+          if (sender) {
+            lastMessageWithSender = {
+              ...lastMessage,
+              sender: {
+                _id: lastMessage.sender,
+                fullName: sender.fullName,
+                phonenumber: sender.phonenumber,
+                profilePhoto: sender.profilePhoto,
+                userType: sender.userType
+              }
+            };
+            
+            // Add full URL for sender profile photo
+            if (sender.profilePhoto) {
+              lastMessageWithSender.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+            }
+            
+            // Add full URLs for message media
+            if (lastMessage.imageUrl) {
+              lastMessageWithSender.imageFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.imageUrl}`;
+            }
+            if (lastMessage.videoUrl) {
+              lastMessageWithSender.videoFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.videoUrl}`;
+            }
+            if (lastMessage.audioUrl) {
+              lastMessageWithSender.audioFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.audioUrl}`;
+            }
+            if (lastMessage.documentUrl) {
+              lastMessageWithSender.documentFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.documentUrl}`;
+            }
+          }
+        }
+      }
+
+      contactObj.chat = {
+        _id: chatData._id,
+        isGroupChat: chatData.isGroupChat,
+        lastActivity: chatData.lastActivity,
+        unreadCount: unreadEntry ? unreadEntry.count : 0,
+        lastMessage: lastMessageWithSender
+      };
+    } else {
+      contactObj.chat = null;
+    }
+
+    return contactObj;
+  } catch (error) {
+    console.error('Error creating contact object:', error);
+    return null;
+  }
+};
+
+// Helper function to populate message with sender details and emit to socket
+const populateAndEmitMessage = async (messageId, chatId, req) => {
+  try {
+    // Get the message and chat
+    const message = await Message.findById(messageId);
+    const chat = await Chat.findById(chatId).populate('lastMessage');
+    
+    if (!message || !chat) {
+      console.error('Message or chat not found for emission:', messageId, chatId);
+      return null;
+    }
+
+    const messageObj = message.toObject();
+
+    // Manually populate sender details
+    if (messageObj.sender) {
+      let sender = await Tenant.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+      
+      if (!sender) {
+        sender = await Owner.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+      }
+      
+      if (sender) {
+        messageObj.sender = {
+          _id: messageObj.sender,
+          fullName: sender.fullName,
+          phonenumber: sender.phonenumber,
+          profilePhoto: sender.profilePhoto,
+          userType: sender.userType
+        };
+        
+        // Add full URL for profile photo
+        if (sender.profilePhoto) {
+          messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+        }
+      }
+    }
+
+    // Add full URLs for media files
+    if (messageObj.imageUrl) {
+      messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${messageObj.imageUrl}`;
+    }
+    if (messageObj.videoUrl) {
+      messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${messageObj.videoUrl}`;
+    }
+    if (messageObj.audioUrl) {
+      messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${messageObj.audioUrl}`;
+    }
+    if (messageObj.documentUrl) {
+      messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
+    }
+
+    const io = req.app.get("io");
+
+    // Emit new message to chat participants
+    io.to(chatId).emit("newMessage", messageObj, (acknowledgments) => {
+      console.log(`Message ${messageId} delivered to ${acknowledgments ? acknowledgments.length : 0} clients`);
+    });
+
+    // Emit contact updates to all participants
+    for (const participantId of chat.participants) {
+      try {
+        // Create contact object for each participant
+        const otherParticipants = chat.participants.filter(p => p.toString() !== participantId.toString());
+        
+        for (const otherParticipantId of otherParticipants) {
+          const contactObj = await createContactObject(otherParticipantId, chat, participantId, req);
+          if (contactObj) {
+            // Emit to the participant's personal room
+            io.to(participantId.toString()).emit("contactUpdated", contactObj, (ack) => {
+              console.log(`Contact update sent to user ${participantId}`);
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error sending contact update to participant ${participantId}:`, error);
+      }
+    }
+
+    return messageObj;
+  } catch (error) {
+    console.error('Error populating and emitting message:', error);
+    return null;
+  }
+};
+
 // Get models that were defined in chatController
 let Chat, Message;
 try {
@@ -98,19 +282,18 @@ const sendMessage = async (req, res) => {
       }
     });
 
+    // Save chat first
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Add full URLs to response
-    const messageObj = populatedMessage.toObject();
-    if (messageObj.sender && messageObj.sender.profilePhoto) {
-      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
     }
-
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
@@ -291,14 +474,14 @@ const sendPhotoMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Add full URLs to response
-    const messageObj = populatedMessage.toObject();
-    messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
-    if (messageObj.sender && messageObj.sender.profilePhoto) {
-      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
     }
 
     res.status(201).json({
@@ -376,17 +559,15 @@ const sendLocationMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Add full URLs to response
-    const messageObj = populatedMessage.toObject();
-    if (messageObj.sender && messageObj.sender.profilePhoto) {
-      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
     }
-
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
@@ -469,18 +650,15 @@ const sendVideoMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Add full URLs to response
-    const messageObj = populatedMessage.toObject();
-    messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
-    if (messageObj.sender && messageObj.sender.profilePhoto) {
-      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
     }
-
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
@@ -563,18 +741,15 @@ const sendDocumentMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Add full URLs to response
-    const messageObj = populatedMessage.toObject();
-    messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
-    if (messageObj.sender && messageObj.sender.profilePhoto) {
-      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
     }
-
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
@@ -657,18 +832,15 @@ const sendAudioMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Add full URLs to response
-    const messageObj = populatedMessage.toObject();
-    messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${result.url}`;
-    if (messageObj.sender && messageObj.sender.profilePhoto) {
-      messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${messageObj.sender.profilePhoto}`;
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
     }
-
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", messageObj);
 
     res.status(201).json({
       success: true,
@@ -816,15 +988,19 @@ const forwardMessage = async (req, res) => {
 
     await targetChat.save();
 
-    const populatedMessage = await Message.findById(newMessage._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(newMessage._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message forwarded but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -940,5 +1116,6 @@ module.exports = {
   editMessage,
   forwardMessage,
   deleteMessage,
-  deleteMediaFile
+  deleteMediaFile,
+  createContactObject
 };

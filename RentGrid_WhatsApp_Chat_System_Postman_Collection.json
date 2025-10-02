@@ -1,8 +1,8 @@
 {
   "info": {
     "name": "RentGrid WhatsApp-like Chat System APIs",
-    "description": "Complete collection of chat, message, and user presence APIs for WhatsApp-like functionality",
-    "version": "1.0.0",
+    "description": "Complete collection of chat, message, and user presence APIs for WhatsApp-like functionality with real-time Socket.IO integration.\n\n## Real-Time Features:\n- **Auto Message Delivery**: Messages are automatically delivered to all participants via Socket.IO\n- **Room Management**: Users automatically join chat rooms and receive real-time updates\n- **Typing Indicators**: See when users are typing in real-time\n- **Online/Offline Status**: Track user presence across chats\n- **Message Acknowledgments**: Confirm message delivery to connected clients\n\n## Socket.IO Events:\n- `newMessage`: Real-time message delivery with full sender details\n- `user-typing` / `user-stop-typing`: Typing indicators\n- `user-joined-chat` / `user-left-chat`: Chat presence\n- `user-status-change`: Online/offline status\n- `message-read-by`: Read receipts\n\n## Authentication:\nInclude JWT token in Socket.IO auth: `{ auth: { token: 'your-jwt-token' } }`",
+    "version": "2.0.0",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -851,6 +851,33 @@
         ],
         "type": "text/javascript"
       }
+    },
+    {
+      "name": "Real-Time Socket.IO Events",
+      "description": "Documentation for Socket.IO real-time messaging events and client implementation",
+      "item": [
+        {
+          "name": "Socket.IO Client Setup",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/socket-docs",
+              "host": ["{{baseUrl}}"],
+              "path": ["socket-docs"]
+            },
+            "description": "## Socket.IO Client Implementation Guide\n\n### 1. Connect to Socket\n```javascript\nconst io = require('socket.io-client');\nconst socket = io('http://localhost:7000', {\n  auth: {\n    token: 'YOUR_JWT_TOKEN_HERE'\n  }\n});\n```\n\n### 2. Auto-Join User Chats\n```javascript\nsocket.on('connect', () => {\n  console.log('Connected to server');\n  // Auto-join all user's chats\n  socket.emit('join-user-chats', (response) => {\n    console.log('Joined chats:', response);\n  });\n});\n```\n\n### 3. Listen for New Messages\n```javascript\nsocket.on('newMessage', (message) => {\n  console.log('New message received:', message);\n  // message includes full sender details and media URLs\n  // Update your chat UI here\n});\n```\n\n### 4. Listen for Contact Updates (NEW!)\n```javascript\nsocket.on('contactUpdated', (contact) => {\n  console.log('Contact updated:', contact);\n  // Update the contact in your contacts list without API call\n  updateContactInList(contact);\n});\n\n// Function to update contact in memory\nfunction updateContactInList(updatedContact) {\n  // Find and update the contact in your local contacts array\n  const index = contacts.findIndex(c => c._id === updatedContact._id);\n  if (index !== -1) {\n    contacts[index] = updatedContact;\n    // Re-sort contacts by lastActivity\n    contacts.sort((a, b) => {\n      const aTime = a.chat?.lastActivity || new Date(0);\n      const bTime = b.chat?.lastActivity || new Date(0);\n      return new Date(bTime) - new Date(aTime);\n    });\n    // Update UI\n    renderContactsList(contacts);\n  }\n}\n```\n\n### 5. Send Typing Indicators\n```javascript\n// User starts typing\nsocket.emit('typing', { chatId: 'CHAT_ID' }, (ack) => {\n  console.log('Typing sent:', ack);\n});\n\n// User stops typing\nsocket.emit('stop-typing', { chatId: 'CHAT_ID' });\n```\n\n### 6. Listen for Typing Indicators\n```javascript\nsocket.on('user-typing', (data) => {\n  console.log(`${data.fullName} is typing in chat ${data.chatId}`);\n});\n\nsocket.on('user-stop-typing', (data) => {\n  console.log(`User stopped typing in chat ${data.chatId}`);\n});\n```\n\n### 7. Handle User Presence\n```javascript\nsocket.on('user-status-change', (data) => {\n  console.log(`${data.fullName} is now ${data.status}`);\n});\n\nsocket.on('user-joined-chat', (data) => {\n  console.log(`${data.fullName} joined the chat`);\n});\n```\n\n### 8. Send Read Receipts\n```javascript\nsocket.emit('message-read', {\n  chatId: 'CHAT_ID',\n  messageId: 'MESSAGE_ID'\n});\n```\n\n### 9. WhatsApp-like Real-time Updates\n```javascript\n// Initialize contacts list\nlet contacts = [];\n\n// Load initial contacts\nfetch('/api/chats/contacts')\n  .then(res => res.json())\n  .then(data => {\n    contacts = data.data;\n    renderContactsList(contacts);\n  });\n\n// Listen for real-time contact updates\nsocket.on('contactUpdated', updateContactInList);\n\n// No need to refresh contacts API - updates happen automatically!\n```"
+          },
+          "response": [
+            {
+              "name": "Socket Events Reference",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"socketEvents\": {\n    \"outgoing\": {\n      \"join-user-chats\": \"Auto-join all user's existing chats\",\n      \"join-chat\": \"Join a specific chat room\",\n      \"leave-chat\": \"Leave a specific chat room\",\n      \"typing\": \"Send typing indicator\",\n      \"stop-typing\": \"Stop typing indicator\",\n      \"message-read\": \"Send read receipt\",\n      \"user-online\": \"Broadcast online status\",\n      \"refresh-contacts\": \"Request contact list refresh acknowledgment\"\n    },\n    \"incoming\": {\n      \"newMessage\": \"Receive new messages with full details\",\n      \"contactUpdated\": \"Real-time contact updates with latest message and activity\",\n      \"user-typing\": \"Receive typing indicators\",\n      \"user-stop-typing\": \"Receive stop typing indicators\",\n      \"user-joined-chat\": \"User joined chat notification\",\n      \"user-left-chat\": \"User left chat notification\",\n      \"user-status-change\": \"Online/offline status changes\",\n      \"message-read-by\": \"Message read receipts\",\n      \"auto-join-chats\": \"Server trigger to auto-join chats\"\n    }\n  },\n  \"messageFormat\": {\n    \"newMessage\": {\n      \"_id\": \"messageId\",\n      \"chat\": \"chatId\",\n      \"sender\": {\n        \"_id\": \"senderId\",\n        \"fullName\": \"User Name\",\n        \"phonenumber\": \"+1234567890\",\n        \"profilePhoto\": \"/uploads/avatars/photo.jpg\",\n        \"profilePhotoUrl\": \"http://localhost:7000/uploads/avatars/photo.jpg\",\n        \"userType\": \"tenant|owner\"\n      },\n      \"messageType\": \"text|image|video|audio|document|location\",\n      \"content\": \"Message content\",\n      \"imageFullUrl\": \"Full URL for images\",\n      \"videoFullUrl\": \"Full URL for videos\",\n      \"audioFullUrl\": \"Full URL for audio\",\n      \"documentFullUrl\": \"Full URL for documents\",\n      \"createdAt\": \"2023-07-20T10:30:00.000Z\"\n    },\n    \"contactUpdated\": {\n      \"_id\": \"contactUserId\",\n      \"fullName\": \"Contact Name\",\n      \"phonenumber\": \"+1234567890\",\n      \"profilePhoto\": \"/uploads/avatars/contact.jpg\",\n      \"profilePhotoUrl\": \"http://localhost:7000/uploads/avatars/contact.jpg\",\n      \"userType\": \"tenant|owner\",\n      \"chat\": {\n        \"_id\": \"chatId\",\n        \"isGroupChat\": false,\n        \"lastActivity\": \"2023-07-20T10:30:00.000Z\",\n        \"unreadCount\": 2,\n        \"lastMessage\": {\n          \"_id\": \"messageId\",\n          \"messageType\": \"text\",\n          \"content\": \"Latest message content\",\n          \"sender\": {\n            \"_id\": \"senderId\",\n            \"fullName\": \"Sender Name\",\n            \"userType\": \"tenant|owner\"\n          },\n          \"createdAt\": \"2023-07-20T10:30:00.000Z\"\n        }\n      }\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

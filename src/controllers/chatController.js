@@ -734,121 +734,70 @@ const getContacts = async (req, res) => {
       });
     }
 
-    let contacts = [];
+    let potentialContacts = [];
     
     // If current user is tenant, get all owners
     if (currentUser.userType === 'tenant') {
-      contacts = await Owner.find({}).select('fullName phonenumber profilePhoto userType');
+      potentialContacts = await Owner.find({}).select('_id');
     } 
     // If current user is owner, get all tenants
     else if (currentUser.userType === 'owner') {
-      contacts = await Tenant.find({}).select('fullName phonenumber profilePhoto userType');
+      potentialContacts = await Tenant.find({}).select('_id');
     }
 
-    // For each contact, check if there's an existing chat and get chat details
-    const contactsWithChats = await Promise.all(
-      contacts.map(async (contact) => {
-        const contactObj = contact.toObject();
-        
-        // Add full URL for profile photo
-        if (contactObj.profilePhoto) {
-          contactObj.profilePhotoUrl = `${req.protocol}://${req.get('host')}${contactObj.profilePhoto}`;
-        }
-        
-        // Find existing chat between current user and this contact
-        const existingChat = await Chat.findOne({
-          participants: { 
-            $all: [req.user._id, contact._id],
-            $size: 2 
-          },
-          isGroupChat: false
-        }).populate('lastMessage');
+    // Get all chats for the current user with populated lastMessage
+    const userChats = await Chat.find({
+      participants: req.user._id
+    }).populate('lastMessage').sort({ lastActivity: -1 });
 
-        if (existingChat) {
-          // Get unread count for current user
-          const unreadEntry = existingChat.unreadCount.find(entry => 
-            entry.user.toString() === req.user._id.toString()
-          );
-          
-          // Populate lastMessage sender details if exists
-          let lastMessageWithSender = existingChat.lastMessage;
-          if (lastMessageWithSender && lastMessageWithSender.sender) {
-            let sender = await Tenant.findById(lastMessageWithSender.sender).select('fullName phonenumber profilePhoto userType');
-            
-            if (!sender) {
-              sender = await Owner.findById(lastMessageWithSender.sender).select('fullName phonenumber profilePhoto userType');
-            }
-            
-            if (sender) {
-              lastMessageWithSender = {
-                ...lastMessageWithSender.toObject(),
-                sender: {
-                  _id: lastMessageWithSender.sender,
-                  fullName: sender.fullName,
-                  phonenumber: sender.phonenumber,
-                  profilePhoto: sender.profilePhoto,
-                  userType: sender.userType
-                }
-              };
-              
-              // Add full URL for sender profile photo
-              if (sender.profilePhoto) {
-                lastMessageWithSender.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
-              }
-              
-              // Add full URLs for message media if exists
-              if (lastMessageWithSender.imageUrl) {
-                lastMessageWithSender.imageFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.imageUrl}`;
-              }
-              if (lastMessageWithSender.videoUrl) {
-                lastMessageWithSender.videoFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.videoUrl}`;
-              }
-              if (lastMessageWithSender.audioUrl) {
-                lastMessageWithSender.audioFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.audioUrl}`;
-              }
-              if (lastMessageWithSender.documentUrl) {
-                lastMessageWithSender.documentFullUrl = `${req.protocol}://${req.get('host')}${lastMessageWithSender.documentUrl}`;
-              }
-            }
-          }
-
-          contactObj.chat = {
-            _id: existingChat._id,
-            isGroupChat: existingChat.isGroupChat,
-            lastActivity: existingChat.lastActivity,
-            unreadCount: unreadEntry ? unreadEntry.count : 0,
-            lastMessage: lastMessageWithSender
-          };
-          
-          // Add sortDate for WhatsApp-like sorting (most recent activity first)
-          contactObj.sortDate = existingChat.lastActivity;
-        } else {
-          contactObj.chat = null;
-          // For contacts without chats, use a very old date so they appear at the bottom
-          contactObj.sortDate = new Date(0);
-        }
-
-        return contactObj;
-      })
-    );
-
-    // Sort contacts WhatsApp-style: 
-    // 1. Contacts with existing chats sorted by most recent activity first
-    // 2. Contacts without chats sorted alphabetically at the bottom
-    const sortedContacts = contactsWithChats.sort((a, b) => {
-      // If both have chats or both don't have chats, sort by activity date (most recent first)
-      if ((a.chat && b.chat) || (!a.chat && !b.chat)) {
-        return new Date(b.sortDate) - new Date(a.sortDate);
+    // Create a map of userId to chat for quick lookup
+    const chatMap = new Map();
+    userChats.forEach(chat => {
+      const otherParticipant = chat.participants.find(p => p.toString() !== req.user._id.toString());
+      if (otherParticipant) {
+        chatMap.set(otherParticipant.toString(), chat);
       }
-      // Contacts with chats come first
-      if (a.chat && !b.chat) return -1;
-      if (!a.chat && b.chat) return 1;
-      
-      return 0;
     });
 
-    // Remove the temporary sortDate field
-    const cleanedContacts = sortedContacts.map(contact => {
+    // Import createContactObject helper from messageController
+    const { createContactObject } = require('./messageController');
+
+    // Build contacts list
+    const contactsWithChats = [];
+    const contactsWithoutChats = [];
+
+    for (const contact of potentialContacts) {
+      const contactId = contact._id.toString();
+      const chat = chatMap.get(contactId);
+      
+      if (chat) {
+        // Contact with existing chat
+        const contactObj = await createContactObject(contact._id, chat, req.user._id, req);
+        if (contactObj) {
+          contactObj.sortDate = chat.lastActivity;
+          contactsWithChats.push(contactObj);
+        }
+      } else {
+        // Contact without chat
+        const contactObj = await createContactObject(contact._id, null, req.user._id, req);
+        if (contactObj) {
+          contactObj.sortDate = new Date(0); // Very old date for sorting
+          contactsWithoutChats.push(contactObj);
+        }
+      }
+    }
+
+    // Sort contacts with chats by lastActivity (most recent first)
+    contactsWithChats.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+
+    // Sort contacts without chats alphabetically
+    contactsWithoutChats.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+    // Combine lists: contacts with chats first, then contacts without chats
+    const allContacts = [...contactsWithChats, ...contactsWithoutChats];
+
+    // Remove temporary sortDate field
+    const cleanedContacts = allContacts.map(contact => {
       const { sortDate, ...contactWithoutSort } = contact;
       return contactWithoutSort;
     });
