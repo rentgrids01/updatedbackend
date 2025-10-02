@@ -34,37 +34,75 @@ const socketHandler = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User ${socket.user.fullName} (${socket.userId}) connected`);
+    console.log(`[SOCKET] User ${socket.user.fullName} (${socket.userId}) connected - Socket ID: ${socket.id}`);
 
     // Join user to their personal room for direct messaging
     socket.join(socket.userId);
-    console.log(`User ${socket.user.fullName} joined personal room: ${socket.userId}`);
+    console.log(`[SOCKET] User ${socket.user.fullName} joined personal room: ${socket.userId}`);
+
+    // Send connection confirmation
+    socket.emit('connection-confirmed', {
+      userId: socket.userId,
+      fullName: socket.user.fullName,
+      userType: socket.user.userType,
+      socketId: socket.id,
+      timestamp: new Date()
+    });
+
+    // Debug room information
+    socket.on('debug-rooms', (callback) => {
+      const rooms = Array.from(socket.rooms);
+      const roomSizes = {};
+      
+      rooms.forEach(room => {
+        const roomData = io.sockets.adapter.rooms.get(room);
+        roomSizes[room] = roomData ? roomData.size : 0;
+      });
+
+      const debugInfo = {
+        socketId: socket.id,
+        userId: socket.userId,
+        userRooms: rooms,
+        roomSizes: roomSizes,
+        totalConnectedSockets: io.sockets.sockets.size
+      };
+
+      console.log(`[DEBUG] Room info for ${socket.user.fullName}:`, debugInfo);
+      
+      if (callback) {
+        callback(debugInfo);
+      }
+    });
 
     // Auto-join all user's existing chats when they connect
     socket.on('join-user-chats', async (callback) => {
       try {
+        console.log(`[SOCKET] User ${socket.user.fullName} (${socket.userId}) requesting to join all chats`);
+        
         const userChats = await Chat.find({
           participants: socket.user._id
-        }).select('_id');
+        }).select('_id participants');
         
         let joinedChats = [];
         userChats.forEach(chat => {
           const chatId = chat._id.toString();
           socket.join(chatId);
           joinedChats.push(chatId);
+          console.log(`[SOCKET] User ${socket.user.fullName} joined chat room: ${chatId}`);
         });
 
-        console.log(`User ${socket.user.fullName} auto-joined ${joinedChats.length} chats`);
+        console.log(`[SOCKET] User ${socket.user.fullName} auto-joined ${joinedChats.length} chat rooms`);
         
         if (callback) {
           callback({
             success: true,
             message: `Joined ${joinedChats.length} chats`,
-            chatIds: joinedChats
+            chatIds: joinedChats,
+            totalRooms: socket.rooms.size
           });
         }
       } catch (error) {
-        console.error('Error joining user chats:', error);
+        console.error(`[SOCKET] Error joining user chats for ${socket.userId}:`, error);
         if (callback) {
           callback({
             success: false,
@@ -75,12 +113,15 @@ const socketHandler = (io) => {
       }
     });
 
-    // Join specific chat
+    // Join specific chat (when user opens a chat)
     socket.on('join-chat', async (chatId, callback) => {
       try {
+        console.log(`[SOCKET] User ${socket.user.fullName} requesting to join chat: ${chatId}`);
+        
         // Verify user is participant in this chat
         const chat = await Chat.findById(chatId);
         if (!chat || !chat.participants.includes(socket.user._id)) {
+          console.warn(`[SOCKET] User ${socket.userId} unauthorized to join chat ${chatId}`);
           if (callback) {
             callback({
               success: false,
@@ -91,24 +132,32 @@ const socketHandler = (io) => {
         }
 
         socket.join(chatId);
-        console.log(`User ${socket.user.fullName} joined chat ${chatId}`);
+        console.log(`[SOCKET] User ${socket.user.fullName} successfully joined chat ${chatId}`);
+        
+        // Get room info for debugging
+        const room = socket.adapter.rooms.get(chatId);
+        const roomSize = room ? room.size : 0;
+        console.log(`[SOCKET] Chat room ${chatId} now has ${roomSize} connected clients`);
         
         // Notify other participants that user is online in this chat
         socket.to(chatId).emit('user-joined-chat', {
           userId: socket.userId,
           fullName: socket.user.fullName,
-          userType: socket.user.userType
+          userType: socket.user.userType,
+          timestamp: new Date()
         });
 
         if (callback) {
           callback({
             success: true,
             message: 'Successfully joined chat',
-            chatId: chatId
+            chatId: chatId,
+            roomSize: roomSize,
+            userRooms: Array.from(socket.rooms)
           });
         }
       } catch (error) {
-        console.error('Error joining chat:', error);
+        console.error(`[SOCKET] Error joining chat ${chatId} for user ${socket.userId}:`, error);
         if (callback) {
           callback({
             success: false,
@@ -121,20 +170,23 @@ const socketHandler = (io) => {
 
     // Leave chat
     socket.on('leave-chat', (chatId, callback) => {
+      console.log(`[SOCKET] User ${socket.user.fullName} leaving chat ${chatId}`);
+      
       socket.leave(chatId);
-      console.log(`User ${socket.user.fullName} left chat ${chatId}`);
       
       // Notify other participants that user left
       socket.to(chatId).emit('user-left-chat', {
         userId: socket.userId,
-        fullName: socket.user.fullName
+        fullName: socket.user.fullName,
+        timestamp: new Date()
       });
 
       if (callback) {
         callback({
           success: true,
           message: 'Successfully left chat',
-          chatId: chatId
+          chatId: chatId,
+          remainingRooms: Array.from(socket.rooms)
         });
       }
     });
@@ -229,7 +281,11 @@ const socketHandler = (io) => {
 
     // Handle disconnect
     socket.on('disconnect', (reason) => {
-      console.log(`User ${socket.user.fullName} disconnected: ${reason}`);
+      console.log(`[SOCKET] User ${socket.user.fullName} (${socket.userId}) disconnected: ${reason}`);
+      
+      // Get rooms before disconnection for logging
+      const userRooms = Array.from(socket.rooms);
+      console.log(`[SOCKET] User was in rooms: ${userRooms.join(', ')}`);
       
       // Broadcast offline status to all user's chats
       socket.rooms.forEach(room => {
@@ -241,11 +297,13 @@ const socketHandler = (io) => {
             timestamp: new Date(),
             reason: reason
           });
+          console.log(`[SOCKET] Broadcasted offline status to room: ${room}`);
         }
       });
     });
 
-    // Auto-join user chats when they connect
+    // Auto-trigger chat joining when user connects
+    console.log(`[SOCKET] Triggering auto-join for user ${socket.user.fullName}`);
     socket.emit('auto-join-chats');
   });
 };

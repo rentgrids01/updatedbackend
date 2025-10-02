@@ -104,12 +104,14 @@ const createContactObject = async (userId, chatData, currentUserId, req) => {
 // Helper function to populate message with sender details and emit to socket
 const populateAndEmitMessage = async (messageId, chatId, req) => {
   try {
+    console.log(`[MESSAGE] Starting emission for message ${messageId} in chat ${chatId}`);
+    
     // Get the message and chat
     const message = await Message.findById(messageId);
     const chat = await Chat.findById(chatId).populate('lastMessage');
     
     if (!message || !chat) {
-      console.error('Message or chat not found for emission:', messageId, chatId);
+      console.error(`[MESSAGE] Message or chat not found - Message: ${!!message}, Chat: ${!!chat}`);
       return null;
     }
 
@@ -136,6 +138,17 @@ const populateAndEmitMessage = async (messageId, chatId, req) => {
         if (sender.profilePhoto) {
           messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
         }
+        
+        console.log(`[MESSAGE] Populated sender details for ${sender.fullName} (${sender.userType})`);
+      } else {
+        console.warn(`[MESSAGE] Sender not found for message ${messageId}`);
+        messageObj.sender = {
+          _id: messageObj.sender,
+          fullName: 'Unknown User',
+          phonenumber: '',
+          profilePhoto: '',
+          userType: 'unknown'
+        };
       }
     }
 
@@ -154,13 +167,31 @@ const populateAndEmitMessage = async (messageId, chatId, req) => {
     }
 
     const io = req.app.get("io");
+    
+    // Get room info for debugging
+    const room = io.sockets.adapter.rooms.get(chatId);
+    const roomSize = room ? room.size : 0;
+    console.log(`[SOCKET] Chat room ${chatId} has ${roomSize} connected clients`);
 
-    // Emit new message to chat participants
-    io.to(chatId).emit("newMessage", messageObj, (acknowledgments) => {
-      console.log(`Message ${messageId} delivered to ${acknowledgments ? acknowledgments.length : 0} clients`);
+    // Emit new message to chat participants with acknowledgment tracking
+    let deliveryCount = 0;
+    io.to(chatId).emit("newMessage", messageObj, (acks) => {
+      deliveryCount = Array.isArray(acks) ? acks.length : (acks ? 1 : 0);
+      console.log(`[SOCKET] Message ${messageId} delivered to ${deliveryCount} clients in room ${chatId}`);
+      
+      // Emit delivery confirmation back to sender
+      if (messageObj.sender && messageObj.sender._id) {
+        io.to(messageObj.sender._id.toString()).emit("messageDelivered", {
+          messageId: messageId,
+          chatId: chatId,
+          deliveredTo: deliveryCount,
+          timestamp: new Date()
+        });
+      }
     });
 
-    // Emit contact updates to all participants
+    // Emit contact updates to all participants (existing functionality)
+    console.log(`[CONTACT] Sending contact updates to ${chat.participants.length} participants`);
     for (const participantId of chat.participants) {
       try {
         // Create contact object for each participant
@@ -171,18 +202,19 @@ const populateAndEmitMessage = async (messageId, chatId, req) => {
           if (contactObj) {
             // Emit to the participant's personal room
             io.to(participantId.toString()).emit("contactUpdated", contactObj, (ack) => {
-              console.log(`Contact update sent to user ${participantId}`);
+              console.log(`[CONTACT] Contact update sent to user ${participantId} - Ack: ${!!ack}`);
             });
           }
         }
       } catch (error) {
-        console.error(`Error sending contact update to participant ${participantId}:`, error);
+        console.error(`[CONTACT] Error sending contact update to participant ${participantId}:`, error);
       }
     }
 
+    console.log(`[MESSAGE] Successfully emitted message ${messageId} to chat ${chatId}`);
     return messageObj;
   } catch (error) {
-    console.error('Error populating and emitting message:', error);
+    console.error(`[MESSAGE] Error populating and emitting message:`, error);
     return null;
   }
 };
@@ -312,9 +344,12 @@ const sendMessage = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
+    
+    console.log(`[API] Getting messages for chat ${chatId} by user ${req.user._id}`);
 
     const chat = await Chat.findById(chatId);
     if (!chat) {
+      console.warn(`[API] Chat ${chatId} not found`);
       return res.status(404).json({
         success: false,
         message: "Chat not found"
@@ -322,31 +357,34 @@ const getMessages = async (req, res) => {
     }
 
     if (!chat.participants.includes(req.user._id)) {
+      console.warn(`[API] User ${req.user._id} unauthorized for chat ${chatId}`);
       return res.status(403).json({
         success: false,
         message: "Unauthorized"
       });
     }
 
+    // Get all messages with proper sorting (oldest first for chronological order)
     const messages = await Message.find({
       chat: chatId,
       isDeleted: false
     })
-      .sort({ createdAt: 1 }); // Get all messages sorted by creation time
+      .sort({ createdAt: 1 }) // ASC order as requested
+      .lean(); // Use lean for better performance
+
+    console.log(`[API] Found ${messages.length} messages in chat ${chatId}`);
 
     // Manually populate sender details from both Tenant and Owner collections
     const messagesWithFullDetails = await Promise.all(
-      messages.map(async (message) => {
-        const messageObj = message.toObject();
-        
+      messages.map(async (messageObj) => {
         // Populate sender details
         if (messageObj.sender) {
           // Try to find in Tenant collection first
-          let sender = await Tenant.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+          let sender = await Tenant.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType').lean();
           
           // If not found in Tenant, try Owner collection
           if (!sender) {
-            sender = await Owner.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+            sender = await Owner.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType').lean();
           }
           
           if (sender) {
@@ -363,6 +401,7 @@ const getMessages = async (req, res) => {
               messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
             }
           } else {
+            console.warn(`[API] Sender ${messageObj.sender} not found for message ${messageObj._id}`);
             messageObj.sender = {
               _id: messageObj.sender,
               fullName: 'Unknown User',
@@ -386,19 +425,39 @@ const getMessages = async (req, res) => {
         if (messageObj.documentUrl) {
           messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
         }
+
+        // Ensure all required fields are present
+        messageObj.isEdited = messageObj.isEdited || false;
+        messageObj.isDeleted = messageObj.isDeleted || false;
+        messageObj.readBy = messageObj.readBy || [];
+        
+        // Add read status for current user
+        const currentUserRead = messageObj.readBy.find(read => 
+          read.user.toString() === req.user._id.toString()
+        );
+        messageObj.isReadByCurrentUser = !!currentUserRead;
+        if (currentUserRead) {
+          messageObj.readByCurrentUserAt = currentUserRead.readAt;
+        }
         
         return messageObj;
       })
     );
 
+    console.log(`[API] Successfully processed and returning ${messagesWithFullDetails.length} messages`);
+
     res.json({
       success: true,
       data: {
+        chatId: chatId,
         messages: messagesWithFullDetails,
-        totalMessages: messages.length
+        totalMessages: messages.length,
+        participants: chat.participants,
+        lastActivity: chat.lastActivity
       }
     });
   } catch (error) {
+    console.error(`[API] Error getting messages for chat ${req.params.chatId}:`, error);
     res.status(500).json({
       success: false,
       message: error.message
