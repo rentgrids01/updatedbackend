@@ -1,0 +1,164 @@
+{
+  "info": {
+    "name": "RentGrid Tenant Profile API - Fixed",
+    "description": "Updated tenant profile API collection with finalization fix",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Finalize Profile Setup (FIXED)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"profileComplete\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/tenant-profile/finalize/:setupId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tenant-profile",
+            "finalize",
+            ":setupId"
+          ],
+          "variable": [
+            {
+              "key": "setupId",
+              "value": "{{setup_id}}",
+              "description": "The setup ID from profile initialization"
+            }
+          ]
+        },
+        "description": "**FIXED VERSION** - Finalizes the tenant profile setup process.\n\n**Fix Applied:**\n- ✅ Changed TenantProfile query from `{ tenant: tenantId }` to `{ userId: tenantId }`\n- ✅ Updated TenantProfile creation to use correct `userId` field\n- ✅ Added comprehensive error handling and logging\n- ✅ Fixed field mapping between ProfileSetup and TenantProfile models\n\n**Expected Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Profile setup finalized successfully\",\n  \"data\": {\n    \"setupId\": \"setup_12345\",\n    \"currentStep\": \"FINALIZATION\",\n    \"progress\": 100,\n    \"isProfileComplete\": true,\n    \"completedAt\": \"2024-01-20T10:30:00.000Z\"\n  }\n}\n```\n\n**Error Scenarios:**\n- 404: Profile setup not found or already completed\n- 401: Invalid or missing JWT token\n- 500: Server error (with detailed logging for debugging)\n\n**Prerequisites:**\n1. Valid JWT token from authentication\n2. Existing ProfileSetup record with matching setupId\n3. Profile setup not already completed"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileComplete\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tenant-profile/finalize/:setupId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tenant-profile",
+                "finalize",
+                ":setupId"
+              ],
+              "variable": [
+                {
+                  "key": "setupId",
+                  "value": "{{setup_id}}"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"success\": true,\n  \"message\": \"Profile setup finalized successfully\",\n  \"data\": {\n    \"setupId\": \"setup_12345\",\n    \"currentStep\": \"FINALIZATION\",\n    \"progress\": 100,\n    \"isProfileComplete\": true,\n    \"completedAt\": \"2024-01-20T10:30:00.000Z\"\n  }\n}"
+        },
+        {
+          "name": "Profile Not Found",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileComplete\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tenant-profile/finalize/invalid_setup_id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tenant-profile",
+                "finalize",
+                "invalid_setup_id"
+              ]
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"success\": false,\n  \"message\": \"Profile setup not found or already completed\"\n}"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:7000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT token obtained from login"
+    },
+    {
+      "key": "setup_id",
+      "value": "",
+      "type": "string",
+      "description": "Setup ID from profile initialization"
+    }
+  ]
+}

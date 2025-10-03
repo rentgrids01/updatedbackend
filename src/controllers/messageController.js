@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const { saveFile } = require('../utils/fileUpload');
 const Tenant = require('../models/Tenant');
 const Owner = require('../models/Owner');
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 
 // Helper function to create contact object for a specific user
 const createContactObject = async (userId, chatData, currentUserId, req) => {
@@ -218,45 +220,6 @@ const populateAndEmitMessage = async (messageId, chatId, req) => {
     return null;
   }
 };
-
-// Get models that were defined in chatController
-let Chat, Message;
-try {
-  Chat = mongoose.model('Chat');
-  Message = mongoose.model('Message');
-} catch (error) {
-  // If models don't exist, create them inline
-  const chatSchema = new mongoose.Schema({
-    participants: [{ type: mongoose.Schema.Types.ObjectId, required: true }],
-    isGroupChat: { type: Boolean, default: false },
-    chatName: String,
-    lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
-    lastActivity: { type: Date, default: Date.now },
-    unreadCount: [{ user: mongoose.Schema.Types.ObjectId, count: { type: Number, default: 0 } }],
-    mutedBy: [{ user: mongoose.Schema.Types.ObjectId, mutedUntil: Date }],
-    archivedBy: [mongoose.Schema.Types.ObjectId]
-  }, { timestamps: true });
-
-  const messageSchema = new mongoose.Schema({
-    chat: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
-    sender: { type: mongoose.Schema.Types.ObjectId, required: true },
-    messageType: { type: String, enum: ['text', 'image', 'location', 'document', 'video', 'audio'], default: 'text' },
-    content: String,
-    imageUrl: String, documentUrl: String, videoUrl: String, audioUrl: String,
-    fileName: String, fileSize: Number, fileMimeType: String,
-    location: { latitude: Number, longitude: Number, address: String },
-    readBy: [{ user: mongoose.Schema.Types.ObjectId, readAt: { type: Date, default: Date.now } }],
-    isEdited: { type: Boolean, default: false },
-    originalContent: String,
-    forwardedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
-    isDeleted: { type: Boolean, default: false }
-  }, { timestamps: true });
-
-  Chat = mongoose.model('Chat', chatSchema);
-  Message = mongoose.model('Message', messageSchema);
-}
-
-// const { uploadToCloudinary } = require("../utils/cloudinary");
 
 // Send Text Message
 const sendMessage = async (req, res) => {
