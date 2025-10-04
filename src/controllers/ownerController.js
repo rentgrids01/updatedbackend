@@ -1,7 +1,7 @@
 const Owner = require("../models/Owner");
 const Property = require("../models/Property");
 const VisitRequest = require("../models/VisitRequest");
-const { saveFile } = require('../utils/fileUpload');
+const { saveFile } = require("../utils/fileUpload");
 // const User = require("../models/User");
 // const LandlordProfile = require("../models/LandlordProfile");
 const Schedule = require("../models/Schedule");
@@ -9,7 +9,12 @@ const PropertyTenantCriteria = require("../models/PropertyTenantCriteria");
 // const { uploadToCloudinary } = require("../utils/cloudinary");
 const UniversalTenantApplication = require("../models/UniversalTenantApplication");
 const calculateMatchScore = require("../utils/calculateMatchScore");
-
+const EmailOTP = require("../models/EmailOTP");
+const {
+  generateOTP,
+  sendOTPEmail,
+  verifyOTP,
+} = require("../utils/emailService");
 // Get Dashboard
 
 const getDashboard = async (req, res) => {
@@ -75,7 +80,7 @@ const getDashboard = async (req, res) => {
 
       return {
         property,
-        tenants:topTenants,
+        tenants: topTenants,
       };
     });
 
@@ -105,17 +110,23 @@ const getProfile = async (req, res) => {
     // Add full URLs for images
     const ownerData = owner.toObject();
     if (ownerData.profilePhoto) {
-      ownerData.profilePhotoUrl = `${req.protocol}://${req.get('host')}${ownerData.profilePhoto}`;
+      ownerData.profilePhotoUrl = `${req.protocol}://${req.get("host")}${
+        ownerData.profilePhoto
+      }`;
     }
     if (ownerData.uploadedImage) {
-      ownerData.uploadedImageUrl = `${req.protocol}://${req.get('host')}${ownerData.uploadedImage}`;
+      ownerData.uploadedImageUrl = `${req.protocol}://${req.get("host")}${
+        ownerData.uploadedImage
+      }`;
     }
-    
+
     // Add full URLs to documents
     if (ownerData.documents && ownerData.documents.length > 0) {
-      ownerData.documents = ownerData.documents.map(doc => ({
+      ownerData.documents = ownerData.documents.map((doc) => ({
         ...doc,
-        documentUrl: doc.documentPath ? `${req.protocol}://${req.get('host')}${doc.documentPath}` : null
+        documentUrl: doc.documentPath
+          ? `${req.protocol}://${req.get("host")}${doc.documentPath}`
+          : null,
       }));
     }
 
@@ -255,16 +266,16 @@ const uploadProfilePhoto = async (req, res) => {
       { new: true }
     ).select("-password");
 
-    const photoUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    const photoUrl = `${req.protocol}://${req.get("host")}${result.url}`;
 
     res.json({
       success: true,
       message: "Profile photo uploaded successfully",
-      data: { 
+      data: {
         profilePhoto: owner.profilePhoto,
         profilePhotoUrl: photoUrl,
         filename: result.filename,
-        originalName: result.originalName
+        originalName: result.originalName,
       },
     });
   } catch (error) {
@@ -296,15 +307,15 @@ const uploadDocument = async (req, res) => {
     const owner = await Owner.findById(req.user._id);
     const newDocument = {
       documentName: documentName || req.file.originalname,
-      documentType: docType || 'OTHER',
+      documentType: docType || "OTHER",
       documentPath: result.url,
-      documentUrl: `${req.protocol}://${req.get('host')}${result.url}`,
+      documentUrl: `${req.protocol}://${req.get("host")}${result.url}`,
       uploadDate: new Date(),
-      verificationStatus: 'pending',
-      tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
-      expiryDate: expiryDate ? new Date(expiryDate) : null
+      verificationStatus: "pending",
+      tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+      expiryDate: expiryDate ? new Date(expiryDate) : null,
     };
-    
+
     owner.documents.push(newDocument);
     await owner.save();
 
@@ -313,7 +324,7 @@ const uploadDocument = async (req, res) => {
       message: "Document uploaded successfully",
       data: {
         ...newDocument,
-        _id: owner.documents[owner.documents.length - 1]._id
+        _id: owner.documents[owner.documents.length - 1]._id,
       },
     });
   } catch (error) {
@@ -327,30 +338,42 @@ const uploadDocument = async (req, res) => {
 // Get Documents
 const getDocuments = async (req, res) => {
   try {
-    const { page = 1, limit = 10, documentType, verificationStatus } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      documentType,
+      verificationStatus,
+    } = req.query;
     const skip = (page - 1) * limit;
-    
+
     const owner = await Owner.findById(req.user._id).select("documents");
-    
+
     let documents = owner.documents || [];
-    
+
     // Apply filters
     if (documentType) {
-      documents = documents.filter(doc => doc.documentType === documentType);
+      documents = documents.filter((doc) => doc.documentType === documentType);
     }
     if (verificationStatus) {
-      documents = documents.filter(doc => doc.verificationStatus === verificationStatus);
+      documents = documents.filter(
+        (doc) => doc.verificationStatus === verificationStatus
+      );
     }
-    
+
     // Add full URLs to documents
-    const documentsWithUrls = documents.map(doc => ({
+    const documentsWithUrls = documents.map((doc) => ({
       ...doc.toObject(),
-      documentUrl: doc.documentPath ? `${req.protocol}://${req.get('host')}${doc.documentPath}` : null
+      documentUrl: doc.documentPath
+        ? `${req.protocol}://${req.get("host")}${doc.documentPath}`
+        : null,
     }));
-    
+
     // Apply pagination
-    const paginatedDocuments = documentsWithUrls.slice(skip, skip + parseInt(limit));
-    
+    const paginatedDocuments = documentsWithUrls.slice(
+      skip,
+      skip + parseInt(limit)
+    );
+
     const totalDocuments = documents.length;
     const totalPages = Math.ceil(totalDocuments / limit);
 
@@ -364,8 +387,8 @@ const getDocuments = async (req, res) => {
           totalDocuments,
           totalPages,
           hasNextPage: page < totalPages,
-          hasPrevPage: page > 1
-        }
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -465,9 +488,12 @@ const getVisitRequests = async (req, res) => {
 const updateVisitRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { action, date, time, note } = req.body;
+    const { action, note } = req.body;
 
-    const visitRequest = await VisitRequest.findById(requestId);
+    const visitRequest = await VisitRequest.findById(requestId).populate(
+      "tenant",
+      "email emailId"
+    );
     if (!visitRequest) {
       return res.status(404).json({
         success: false,
@@ -491,52 +517,34 @@ const updateVisitRequest = async (req, res) => {
         break;
 
       case "accept_and_schedule":
-        if (!date || !time) {
-          return res.status(400).json({
-            success: false,
-            message: "Date and time are required to schedule a visit",
-          });
-        }
-
-        // Normalize times for comparison
-        const normalizedTime = time.trim().toLowerCase();
-
-        // Find matching slot
-        const matchedSlot = visitRequest.slots.find(
-          (slot) => slot.scheduledTime.trim().toLowerCase() === normalizedTime
-        );
-
-        if (!matchedSlot) {
-          return res.status(400).json({
-            success: false,
-            message: "Selected time does not match tenant's available slots",
-          });
-        }
-
-        // Update visit request
+        // Simply approve the visit request without requiring date/time from landlord
+        // The tenant has already provided the schedule details when creating the request
         updateData.status = "landlord_approved";
-        updateData.scheduledDate = date;
-        updateData.scheduledTime = time;
         updateData.notes = note || visitRequest.notes;
         updateData.progress = 100;
 
-        // Create a confirmed schedule
+        // Create a confirmed schedule using the existing visit request data
         await Schedule.create({
           tenant: visitRequest.tenant,
           landlord: visitRequest.landlord,
           property: visitRequest.property,
-          date,
-          time,
-          notes: note,
+          date: visitRequest.scheduledDate,
+          time: visitRequest.slots[0]?.scheduledTime, // Use first slot or you could modify this logic
+          notes: note || visitRequest.notes,
           status: "confirmed",
         });
 
-        
+        const otp = generateOTP();
+        await EmailOTP.create({
+          email: visitRequest.tenant.emailId,
+          otp,
+          purpose: "visit-verification",
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          verified: false,
+        });
 
-        // Remove booked slot safely
-        visitRequest.slots = visitRequest.slots.filter(
-          (slot) => slot.scheduledTime.trim().toLowerCase() !== normalizedTime
-        );
+        await sendOTPEmail(visitRequest.tenant.emailId, "visit-verification");
+
         await visitRequest.save();
 
         break;
@@ -551,7 +559,9 @@ const updateVisitRequest = async (req, res) => {
     await VisitRequest.findByIdAndUpdate(requestId, updateData);
 
     // Return updated visit request
-    const updatedRequest = await VisitRequest.findById(requestId);
+    const updatedRequest = await VisitRequest.findById(requestId)
+      .populate("tenant", "fullName emailId phonenumber")
+      .populate("property", "title address");
 
     res.json({
       success: true,
@@ -563,6 +573,86 @@ const updateVisitRequest = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+const verifyVisitRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { otp } = req.body;
+    const ownerId = req.user._id;
+
+    // Validate input
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP is required",
+      });
+    }
+
+    // Find the visit request
+    const visitRequest = await VisitRequest.findById(requestId).populate(
+      "tenant",
+      "emailId"
+    );
+
+    if (!visitRequest) {
+      return res.status(404).json({
+        success: false,
+        message: "Visit request not found",
+      });
+    }
+
+    if (visitRequest.landlord._id.toString() !== ownerId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to verify this visit request",
+      });
+    }
+
+    if (
+      visitRequest.status !== "landlord_approved" &&
+      visitRequest.status !== "scheduled"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Visit request is not in a verifiable state",
+      });
+    }
+
+    const otpVerification = await verifyOTP(
+      visitRequest.tenant.emailId,
+      otp,
+      "visit-verification"
+    );
+
+    if (!otpVerification.success) {
+      return res.status(400).json({
+        success: false,
+        message: otpVerification.message || "Invalid or expired OTP",
+      });
+    }
+
+    visitRequest.status = "completed";
+    visitRequest.updatedAt = new Date();
+    await visitRequest.save();
+
+    res.json({
+      success: true,
+      message: "Visit verification successful. Visit marked as completed.",
+      data: {
+        requestId: visitRequest._id,
+        status: visitRequest.status,
+        completedAt: visitRequest.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Error verifying visit request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify visit request",
+      error: error.message,
     });
   }
 };
@@ -1002,10 +1092,16 @@ const updateDocument = async (req, res) => {
     }
 
     // Update document details
-    if (documentName) owner.documents[documentIndex].documentName = documentName;
-    if (documentType) owner.documents[documentIndex].documentType = documentType;
-    if (tags) owner.documents[documentIndex].tags = tags.split(',').map(tag => tag.trim());
-    if (expiryDate) owner.documents[documentIndex].expiryDate = new Date(expiryDate);
+    if (documentName)
+      owner.documents[documentIndex].documentName = documentName;
+    if (documentType)
+      owner.documents[documentIndex].documentType = documentType;
+    if (tags)
+      owner.documents[documentIndex].tags = tags
+        .split(",")
+        .map((tag) => tag.trim());
+    if (expiryDate)
+      owner.documents[documentIndex].expiryDate = new Date(expiryDate);
 
     await owner.save();
 
@@ -1030,8 +1126,10 @@ const initializeProfileSetup = async (req, res) => {
     const ownerId = req.user._id;
     const { email, fullName, contact } = req.body;
 
-    const setupId = `setup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+    const setupId = `setup_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+
     // Create or update owner with setup tracking
     let owner = await Owner.findById(ownerId);
     if (!owner) {
@@ -1042,8 +1140,8 @@ const initializeProfileSetup = async (req, res) => {
           currentStep: 1,
           totalSteps: 7,
           completedSteps: [],
-          isComplete: false
-        }
+          isComplete: false,
+        },
       });
     } else {
       owner.setupId = setupId;
@@ -1051,7 +1149,7 @@ const initializeProfileSetup = async (req, res) => {
         currentStep: 1,
         totalSteps: 7,
         completedSteps: [],
-        isComplete: false
+        isComplete: false,
       };
     }
 
@@ -1068,8 +1166,8 @@ const initializeProfileSetup = async (req, res) => {
         setupId,
         progress: owner.setupProgress,
         currentStep: 1,
-        nextStep: "personal-details"
-      }
+        nextStep: "personal-details",
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1084,7 +1182,8 @@ const savePersonalDetails = async (req, res) => {
   try {
     const ownerId = req.user._id;
     const { setupId } = req.params;
-    const { fullName, email, contact, dateOfBirth, age, propertyType } = req.body;
+    const { fullName, email, contact, dateOfBirth, age, propertyType } =
+      req.body;
 
     const owner = await Owner.findById(ownerId);
     if (!owner || owner.setupId !== setupId) {
@@ -1103,8 +1202,8 @@ const savePersonalDetails = async (req, res) => {
     if (propertyType) owner.propertyType = propertyType;
 
     // Update progress
-    if (!owner.setupProgress.completedSteps.includes('personal-details')) {
-      owner.setupProgress.completedSteps.push('personal-details');
+    if (!owner.setupProgress.completedSteps.includes("personal-details")) {
+      owner.setupProgress.completedSteps.push("personal-details");
     }
     owner.setupProgress.currentStep = 2;
 
@@ -1116,8 +1215,8 @@ const savePersonalDetails = async (req, res) => {
       data: {
         progress: owner.setupProgress,
         currentStep: 2,
-        nextStep: "avatar"
-      }
+        nextStep: "avatar",
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1148,8 +1247,8 @@ const selectAvatar = async (req, res) => {
     if (isUploading !== undefined) owner.isUploading = isUploading;
 
     // Update progress
-    if (!owner.setupProgress.completedSteps.includes('avatar')) {
-      owner.setupProgress.completedSteps.push('avatar');
+    if (!owner.setupProgress.completedSteps.includes("avatar")) {
+      owner.setupProgress.completedSteps.push("avatar");
     }
     owner.setupProgress.currentStep = 3;
 
@@ -1161,8 +1260,8 @@ const selectAvatar = async (req, res) => {
       data: {
         progress: owner.setupProgress,
         currentStep: 3,
-        nextStep: "photo"
-      }
+        nextStep: "photo",
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1200,13 +1299,13 @@ const uploadSetupPhoto = async (req, res) => {
       req.file.originalname
     );
 
-    const photoUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    const photoUrl = `${req.protocol}://${req.get("host")}${result.url}`;
     owner.profilePhoto = result.url;
     owner.uploadedImage = result.url;
 
     // Update progress
-    if (!owner.setupProgress.completedSteps.includes('photo')) {
-      owner.setupProgress.completedSteps.push('photo');
+    if (!owner.setupProgress.completedSteps.includes("photo")) {
+      owner.setupProgress.completedSteps.push("photo");
     }
     owner.setupProgress.currentStep = 4;
 
@@ -1222,8 +1321,8 @@ const uploadSetupPhoto = async (req, res) => {
         originalName: result.originalName,
         progress: owner.setupProgress,
         currentStep: 4,
-        nextStep: "complete-profile"
-      }
+        nextStep: "complete-profile",
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1238,7 +1337,16 @@ const completeProfileDetails = async (req, res) => {
   try {
     const ownerId = req.user._id;
     const { setupId } = req.params;
-    const { fullName, email, contact, dateOfBirth, age, selectedAvatar, uploadedImage, propertyType } = req.body;
+    const {
+      fullName,
+      email,
+      contact,
+      dateOfBirth,
+      age,
+      selectedAvatar,
+      uploadedImage,
+      propertyType,
+    } = req.body;
 
     const owner = await Owner.findById(ownerId);
     if (!owner || owner.setupId !== setupId) {
@@ -1259,8 +1367,8 @@ const completeProfileDetails = async (req, res) => {
     if (propertyType) owner.propertyType = propertyType;
 
     // Update progress
-    if (!owner.setupProgress.completedSteps.includes('complete-profile')) {
-      owner.setupProgress.completedSteps.push('complete-profile');
+    if (!owner.setupProgress.completedSteps.includes("complete-profile")) {
+      owner.setupProgress.completedSteps.push("complete-profile");
     }
     owner.setupProgress.currentStep = 5;
 
@@ -1272,8 +1380,8 @@ const completeProfileDetails = async (req, res) => {
       data: {
         progress: owner.setupProgress,
         currentStep: 5,
-        nextStep: "id-document"
-      }
+        nextStep: "id-document",
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1312,17 +1420,17 @@ const uploadIdDocument = async (req, res) => {
       req.file.originalname
     );
 
-    const documentUrl = `${req.protocol}://${req.get('host')}${result.url}`;
+    const documentUrl = `${req.protocol}://${req.get("host")}${result.url}`;
     const newDocument = {
       documentName: idFileName || req.file.originalname,
-      documentType: documentType || 'OTHER',
+      documentType: documentType || "OTHER",
       documentPath: result.url,
       documentUrl: documentUrl,
       filename: result.filename,
       originalName: result.originalName,
       uploadDate: new Date(),
-      verificationStatus: 'pending',
-      tags: ['identity', 'setup']
+      verificationStatus: "pending",
+      tags: ["identity", "setup"],
     };
 
     if (!owner.documents) {
@@ -1331,8 +1439,8 @@ const uploadIdDocument = async (req, res) => {
     owner.documents.push(newDocument);
 
     // Update progress
-    if (!owner.setupProgress.completedSteps.includes('id-document')) {
-      owner.setupProgress.completedSteps.push('id-document');
+    if (!owner.setupProgress.completedSteps.includes("id-document")) {
+      owner.setupProgress.completedSteps.push("id-document");
     }
     owner.setupProgress.currentStep = 6;
 
@@ -1344,12 +1452,12 @@ const uploadIdDocument = async (req, res) => {
       data: {
         document: {
           ...newDocument,
-          _id: owner.documents[owner.documents.length - 1]._id
+          _id: owner.documents[owner.documents.length - 1]._id,
         },
         progress: owner.setupProgress,
         currentStep: 6,
-        nextStep: "finalize"
-      }
+        nextStep: "finalize",
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1376,7 +1484,7 @@ const finalizeProfileSetup = async (req, res) => {
 
     // Finalize setup
     if (profileComplete) {
-      owner.setupProgress.completedSteps.push('finalize');
+      owner.setupProgress.completedSteps.push("finalize");
       owner.setupProgress.currentStep = 7;
       owner.setupProgress.isComplete = true;
       owner.profileCompleted = true;
@@ -1390,8 +1498,8 @@ const finalizeProfileSetup = async (req, res) => {
       data: {
         progress: owner.setupProgress,
         profileComplete: true,
-        setupComplete: true
-      }
+        setupComplete: true,
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1416,13 +1524,13 @@ const getSetupStatus = async (req, res) => {
     }
 
     const stepMap = {
-      1: 'initialize',
-      2: 'personal-details',
-      3: 'avatar',
-      4: 'photo',
-      5: 'complete-profile',
-      6: 'id-document',
-      7: 'finalize'
+      1: "initialize",
+      2: "personal-details",
+      3: "avatar",
+      4: "photo",
+      5: "complete-profile",
+      6: "id-document",
+      7: "finalize",
     };
 
     // Prepare owner data with full URLs
@@ -1431,15 +1539,19 @@ const getSetupStatus = async (req, res) => {
       email: owner.email,
       phoneNumber: owner.phoneNumber,
       profilePhoto: owner.profilePhoto,
-      selectedAvatar: owner.selectedAvatar
+      selectedAvatar: owner.selectedAvatar,
     };
 
     // Add full URLs for images
     if (owner.profilePhoto) {
-      ownerData.profilePhotoUrl = `${req.protocol}://${req.get('host')}${owner.profilePhoto}`;
+      ownerData.profilePhotoUrl = `${req.protocol}://${req.get("host")}${
+        owner.profilePhoto
+      }`;
     }
     if (owner.uploadedImage) {
-      ownerData.uploadedImageUrl = `${req.protocol}://${req.get('host')}${owner.uploadedImage}`;
+      ownerData.uploadedImageUrl = `${req.protocol}://${req.get("host")}${
+        owner.uploadedImage
+      }`;
     }
 
     res.json({
@@ -1452,8 +1564,8 @@ const getSetupStatus = async (req, res) => {
         currentStepName: stepMap[owner.setupProgress.currentStep],
         completedSteps: owner.setupProgress.completedSteps,
         isComplete: owner.setupProgress.isComplete,
-        owner: ownerData
-      }
+        owner: ownerData,
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -1493,4 +1605,5 @@ module.exports = {
   uploadIdDocument,
   finalizeProfileSetup,
   getSetupStatus,
+  verifyVisitRequest,
 };
