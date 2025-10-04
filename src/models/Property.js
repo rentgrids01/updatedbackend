@@ -22,65 +22,26 @@ const propertySchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  city: {
-    type: String,
-    default: "",
-  },
-   state: {
-    type: String,
-    default: "",
-  },
-   locality: {
-    type: String,
-    default: "",
-  },
-   description: {
+  description: {
     type: String,
     required: true,
-  },
-   fullAddress: {
-    type: String,
-    default: "",
   },
   propertyType: {
     type: String,
     required: true,
     enum: ["apartment", "house", "villa", "studio", "pg", "hostel"],
   },
-  listingType: {
-    type: String,
-    required: true,
-    enum: ["rent", "sale"],
-  },
   monthlyRent: {
     type: Number,
-    required: function () {
-      return this.listingType === "rent";
-    },
+    required:true,
   },
-  salePrice: {
+  securityDeposit:{
     type: Number,
-    required: function () {
-      return this.listingType === "sale";
-    },
-  },
-  securityDeposit: Number,
-  maintenanceCharge: {
-    type: Number,
-    default: 0,
-  },
-  maintenanceCharges: {
-    type: String,
-    default: "Not specified",
-  },
-  area: {
-    type: Number,
-    required: true,
+    required:true,
   },
   areaUnit: {
-    type: String,
-    enum: ["sqft", "sqm"],
-    default: "sqft",
+    type: Number,
+    required: true,
   },
   bedroom: {
     type: Number,
@@ -90,19 +51,10 @@ const propertySchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  balcony: {
-    type: String,
-    default: "Not specified",
-  },
   floor: {
-    type: String,
-    default: "Not specified",
-  },
-  floorNo: {
     type: Number,
-    default: 0,
+    required: true,
   },
-  totalFloors: Number,
   bhk: {
     type: String,
     required: true,
@@ -114,17 +66,9 @@ const propertySchema = new mongoose.Schema({
     required: true,
   },
   availableFrom: Date,
-  availabilityDate: {
-    type: String,
-    default: "Not specified",
-  },
   ageOfBuilding: {
     type: String,
     default: "Not specified",
-  },
-  parking: {
-    type: String,
-    default: "Not Available",
   },
   availableFor: {
     type: String,
@@ -136,7 +80,7 @@ const propertySchema = new mongoose.Schema({
   },
   nearbyPlaces: {
     type: [String],
-    default: ["Metro Station - 500m", "Shopping Mall - 1km", "School - 300m", "Hospital - 2km"],
+    default: false
   },
   location: {
     city: {
@@ -175,7 +119,6 @@ const propertySchema = new mongoose.Schema({
     },
   ],
   images: [String],
-  documents: [String],
   status: {
     type: String,
     enum: ["request", "draft", "published", "rented", "sold", "inactive"],
@@ -194,25 +137,42 @@ const propertySchema = new mongoose.Schema({
     default: true,
   },
   landlordSchedule: {
-    type: {
-      scheduledDate: {
-        type: Date,
-        required: true,
-      },
-      slots: {
-        type: [
-          {
-            scheduledTime: {
-              type: String,
-              required: true,
-              match: /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i,
+    type: [
+      {
+        scheduledDate: {
+          type: Date,
+          required: true,
+        },
+        slots: {
+          type: [
+            {
+              scheduledTime: {
+                type: String,
+                required: true,
+                match: /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i,
+              },
             },
+          ],
+          validate: {
+            validator: function (val) {
+              return val.length > 0; // at least one slot per date
+            },
+            message: "At least one slot is required for each date.",
           },
-        ],
-        validate: [(val) => val.length > 0, "At least one slot is required"],
+        },
       },
+    ],
+    validate: {
+      validator: function (val) {
+        const dates = val.map(
+          (v) => v.scheduledDate?.toISOString().split("T")[0]
+        );
+        return new Set(dates).size === dates.length;
+      },
+      message: "Duplicate scheduled dates are not allowed.",
     },
   },
+
   createdAt: {
     type: Date,
     default: Date.now,
