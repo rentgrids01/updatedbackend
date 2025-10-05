@@ -1134,6 +1134,268 @@ const deleteMediaFile = async (req, res) => {
   }
 };
 
+// Get read status for specific messages
+const getMessageReadStatus = async (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'messageIds array is required'
+      });
+    }
+
+    // Get messages with their read status
+    const messages = await Message.find({
+      _id: { $in: messageIds }
+    })
+    .select('_id readBy chat sender createdAt')
+    .populate({
+      path: 'readBy.user',
+      select: 'fullName profilePhoto userType'
+    })
+    .populate({
+      path: 'sender',
+      select: 'fullName profilePhoto userType'
+    });
+
+    // Verify user has access to these messages by checking chat participation
+    const chatIds = [...new Set(messages.map(msg => msg.chat.toString()))];
+    const userChats = await Chat.find({
+      _id: { $in: chatIds },
+      participants: currentUserId
+    }).select('_id participants');
+
+    const authorizedChatIds = userChats.map(chat => chat._id.toString());
+    const chatParticipantMap = {};
+    
+    userChats.forEach(chat => {
+      chatParticipantMap[chat._id.toString()] = chat.participants.length;
+    });
+    
+    // Filter messages to only include those from chats user has access to
+    const authorizedMessages = messages.filter(msg => 
+      authorizedChatIds.includes(msg.chat.toString())
+    );
+
+    const readStatusData = authorizedMessages.map(message => {
+      const totalParticipants = chatParticipantMap[message.chat.toString()] || 0;
+      return {
+        messageId: message._id,
+        chatId: message.chat,
+        sender: {
+          _id: message.sender._id,
+          fullName: message.sender.fullName,
+          profilePhoto: message.sender.profilePhoto,
+          userType: message.sender.userType
+        },
+        createdAt: message.createdAt,
+        readBy: message.readBy.map(read => ({
+          userId: read.user._id,
+          fullName: read.user.fullName,
+          profilePhoto: read.user.profilePhoto,
+          userType: read.user.userType,
+          readAt: read.readAt
+        })),
+        readCount: message.readBy.length,
+        unreadCount: totalParticipants - message.readBy.length,
+        totalParticipants: totalParticipants,
+        isFullyRead: message.readBy.length === totalParticipants,
+        isReadByCurrentUser: message.readBy.some(read => 
+          read.user && read.user._id && read.user._id.toString() === currentUserId.toString()
+        )
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Read status retrieved successfully',
+      data: readStatusData
+    });
+
+  } catch (error) {
+    console.error('Error getting message read status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get read status',
+      error: error.message
+    });
+  }
+};
+
+// Mark message as read
+const markMessageAsRead = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const currentUserId = req.user.id;
+
+    if (!messageId) {
+      return res.status(400).json({
+        success: false,
+        message: 'messageId is required'
+      });
+    }
+
+    // Find the message and verify access
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    // Verify user is participant in the chat
+    const chat = await Chat.findById(message.chat);
+    if (!chat || !chat.participants.some(p => p.equals(currentUserId))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to mark this message as read'
+      });
+    }
+
+    // Check if user has already read this message
+    const alreadyRead = message.readBy.some(read => 
+      read.user && read.user.equals && read.user.equals(currentUserId)
+    );
+
+    if (!alreadyRead) {
+      // Mark as read
+      message.readBy.push({
+        user: currentUserId,
+        readAt: new Date()
+      });
+      await message.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Message marked as read successfully',
+      data: {
+        messageId: messageId,
+        alreadyRead: alreadyRead,
+        readAt: new Date(),
+        readCount: message.readBy.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error marking message as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark message as read',
+      error: error.message
+    });
+  }
+};
+
+// Mark multiple messages as read
+const markMessagesAsRead = async (req, res) => {
+  try {
+    const { messageIds, chatId } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'messageIds array is required'
+      });
+    }
+
+    // Verify user is participant in the chat if chatId is provided
+    if (chatId) {
+      const chat = await Chat.findById(chatId);
+      if (!chat || !chat.participants.some(p => p.equals(currentUserId))) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to mark messages in this chat as read'
+        });
+      }
+    }
+
+    // Update multiple messages at once
+    const updateQuery = {
+      _id: { $in: messageIds },
+      "readBy.user": { $ne: currentUserId }
+    };
+
+    if (chatId) {
+      updateQuery.chat = chatId;
+    }
+
+    const result = await Message.updateMany(
+      updateQuery,
+      {
+        $push: {
+          readBy: {
+            user: currentUserId,
+            readAt: new Date()
+          }
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `${result.modifiedCount} messages marked as read`,
+      data: {
+        messageIds: messageIds,
+        chatId: chatId,
+        modifiedCount: result.modifiedCount,
+        readAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark messages as read',
+      error: error.message
+    });
+  }
+};
+
+// Get unread messages count for user
+const getUnreadMessagesCount = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+
+    // Get all chats for the user
+    const userChats = await Chat.find({
+      participants: currentUserId
+    }).select('_id');
+
+    const chatIds = userChats.map(chat => chat._id);
+
+    // Count unread messages across all chats
+    const unreadCount = await Message.countDocuments({
+      chat: { $in: chatIds },
+      "readBy.user": { $ne: currentUserId },
+      isDeleted: false
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Unread messages count retrieved successfully',
+      data: {
+        unreadCount: unreadCount,
+        totalChats: chatIds.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting unread messages count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread messages count',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   sendMessage,
   getMessages,
@@ -1146,5 +1408,9 @@ module.exports = {
   forwardMessage,
   deleteMessage,
   deleteMediaFile,
-  createContactObject
+  createContactObject,
+  getMessageReadStatus,
+  markMessageAsRead,
+  markMessagesAsRead,
+  getUnreadMessagesCount
 };
