@@ -8,13 +8,14 @@ const fileFilter = (req, file, cb) => {
   const allowedImages = /\.(jpg|jpeg|png|gif|webp)$/i;
   const allowedDocs = /\.(pdf|doc|docx)$/i;
   const allowedVideos = /\.(mp4|avi|mov|wmv)$/i;
+  const allowedAudio = /\.(mp3|wav|aac|ogg|m4a|flac)$/i;
 
   const extension = path.extname(file.originalname);
   
-  if (allowedImages.test(extension) || allowedDocs.test(extension) || allowedVideos.test(extension)) {
+  if (allowedImages.test(extension) || allowedDocs.test(extension) || allowedVideos.test(extension) || allowedAudio.test(extension)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only images, documents, and videos are allowed.'), false);
+    cb(new Error('Invalid file type. Only images, documents, videos, and audio files are allowed.'), false);
   }
 };
 

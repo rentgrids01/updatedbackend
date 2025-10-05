@@ -382,6 +382,9 @@ const markChatAsRead = async (req, res) => {
       });
     }
 
+    // Get current unread count before resetting
+    const previousUnreadCount = chat.getUnreadCount(req.user._id);
+
     // Reset unread count for this user
     const unreadIndex = chat.unreadCount.findIndex(
       uc => uc.user.toString() === req.user._id.toString()
@@ -398,9 +401,53 @@ const markChatAsRead = async (req, res) => {
 
     await chat.save();
 
+    // Mark all unread messages in this chat as read by this user
+    await Message.updateMany(
+      {
+        chat: chatId,
+        "readBy.user": { $ne: req.user._id }
+      },
+      {
+        $push: {
+          readBy: {
+            user: req.user._id,
+            readAt: new Date()
+          }
+        }
+      }
+    );
+
+    // Emit socket event if io is available (for real-time updates)
+    const io = req.app.get('io');
+    if (io) {
+      // Broadcast to the chat room that messages have been read
+      io.to(chatId).emit("chat-marked-read", {
+        chatId: chatId,
+        readBy: {
+          userId: req.user._id.toString(),
+          fullName: req.user.fullName,
+          readAt: new Date(),
+        },
+        previousUnreadCount: previousUnreadCount,
+      });
+
+      // Broadcast unread count update to user's personal room
+      io.to(req.user._id.toString()).emit("unread-count-updated", {
+        chatId: chatId,
+        unreadCount: 0,
+        previousCount: previousUnreadCount,
+        timestamp: new Date(),
+      });
+    }
+
     res.json({
       success: true,
-      message: 'Chat marked as read'
+      message: 'Chat marked as read',
+      data: {
+        chatId: chatId,
+        previousUnreadCount: previousUnreadCount,
+        newUnreadCount: 0
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -705,6 +752,47 @@ const getContacts = async (req, res) => {
   }
 };
 
+// Get Total Unread Count
+const getTotalUnreadCount = async (req, res) => {
+  try {
+    const chats = await Chat.find({
+      participants: req.user._id
+    }).select('unreadCount');
+
+    let totalUnreadCount = 0;
+    let chatCounts = [];
+
+    chats.forEach(chat => {
+      const unreadEntry = chat.unreadCount.find(
+        entry => entry.user && entry.user.toString() === req.user._id.toString()
+      );
+      const count = unreadEntry ? unreadEntry.count : 0;
+      totalUnreadCount += count;
+      
+      if (count > 0) {
+        chatCounts.push({
+          chatId: chat._id,
+          unreadCount: count
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalUnreadCount,
+        chatCounts,
+        totalChats: chats.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllChats,
   getChatDetails,
@@ -718,5 +806,6 @@ module.exports = {
   unmuteChat,
   archiveChat,
   unarchiveChat,
-  getContacts
+  getContacts,
+  getTotalUnreadCount
 };

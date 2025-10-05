@@ -50,14 +50,14 @@ const io = new Server(server, {
       'http://127.0.0.1:3000'
     ],
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
   }
 });
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 10000, // 15 minutes
+  max: 1000 // limit each IP to 100 requests per windowMs
 });
 
 // Middleware

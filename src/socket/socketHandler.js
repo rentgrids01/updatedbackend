@@ -255,12 +255,21 @@ const socketHandler = (io) => {
     // Handle sending new messages
     socket.on("send-message", async (data, callback) => {
       try {
-        const { chatId, content } = data;
+        const {
+          chatId,
+          content,
+          messageType = "text",
+          fileUrl,
+          fileName,
+          fileMimeType,
+          fileSize,
+          location,
+        } = data;
 
-        if (!chatId || !content) {
+        if (!chatId) {
           return callback?.({
             success: false,
-            message: "chatId and content required",
+            message: "chatId is required",
           });
         }
 
@@ -276,58 +285,94 @@ const socketHandler = (io) => {
           });
         }
 
-        // ✅ Create message in Message model
-        const newMessage = await Message.create({
+        // Prepare message payload
+        const messagePayload = {
           chat: chatId,
           sender: socket.user._id,
           senderModel: socket.user.userType === "tenant" ? "Tenant" : "Owner",
-          content,
+          content: messageType === "text" ? content : null,
+          messageType,
           readBy: [{ user: socket.user._id, readAt: new Date() }],
-        });
+        };
 
-        // Populate sender details to get full user information
+        // Add file info if messageType is not text
+        if (["image", "video", "document", "audio"].includes(messageType)) {
+          // Map fileUrl to the correct field based on messageType
+          if (messageType === "image") {
+            messagePayload.imageUrl = fileUrl;
+          } else if (messageType === "video") {
+            messagePayload.videoUrl = fileUrl;
+          } else if (messageType === "document") {
+            messagePayload.documentUrl = fileUrl;
+          } else if (messageType === "audio") {
+            messagePayload.audioUrl = fileUrl;
+          }
+
+          messagePayload.fileName = fileName;
+          messagePayload.fileMimeType = fileMimeType;
+          messagePayload.fileSize = fileSize;
+        }
+
+        // Add location if messageType is location
+        if (messageType === "location") {
+          messagePayload.location = location;
+        }
+
+        // Create message
+        const newMessage = await Message.create(messagePayload);
+
+        // Populate sender details
         await newMessage.populate({
-          path: 'sender',
-          select: 'fullName email phoneNumber profilePhoto userType'
+          path: "sender",
+          select: "fullName email phoneNumber profilePhoto userType",
         });
 
-        // Update chat lastMessage + lastActivity
+        // Update chat lastMessage + lastActivity and increment unread count for other participants
         chat.lastMessage = newMessage._id;
         chat.updateLastActivity();
+        
+        // Increment unread count for all participants except the sender
+        chat.participants.forEach((participantId) => {
+          if (participantId.toString() !== socket.userId) {
+            chat.incrementUnreadCount(participantId);
+          }
+        });
+        
         await chat.save();
 
-        // Broadcast to both sender & receiver with populated data
-        io.to(chatId).emit("new-message", {
-          chat: newMessage.chat,
-          _id: newMessage._id,
-          sender: newMessage.sender,
-          senderModel: newMessage.senderModel,
-          content: newMessage.content,
-          messageType: newMessage.messageType,
-          createdAt: newMessage.createdAt,
-          updatedAt: newMessage.updatedAt,
-          readBy: newMessage.readBy,
-          isEdited: newMessage.isEdited,
-          isDeleted: newMessage.isDeleted
+        // Broadcast message to chat room
+        io.to(chatId).emit("new-message", newMessage);
+
+        // Send unread count updates to each participant
+        chat.participants.forEach((participantId) => {
+          if (participantId.toString() !== socket.userId) {
+            const unreadCount = chat.getUnreadCount(participantId);
+            io.to(participantId.toString()).emit("unread-count-updated", {
+              chatId: chatId,
+              unreadCount: unreadCount,
+              newMessage: {
+                _id: newMessage._id,
+                content: newMessage.content,
+                messageType: newMessage.messageType,
+                sender: {
+                  _id: socket.user._id,
+                  fullName: socket.user.fullName,
+                },
+                createdAt: newMessage.createdAt,
+              },
+              timestamp: new Date(),
+            });
+            io.to(participantId.toString()).emit("refresh-contacts");
+          }
         });
 
-        // ✅ Respond back to sender
+        // Respond to sender
         callback?.({
           success: true,
-          message: "Message sent successfully",
-          data: {
-            chat: newMessage.chat,
-            _id: newMessage._id,
-            sender: newMessage.sender,
-            senderModel: newMessage.senderModel,
-            content: newMessage.content,
-            messageType: newMessage.messageType,
-            createdAt: newMessage.createdAt,
-            updatedAt: newMessage.updatedAt,
-            readBy: newMessage.readBy,
-            isEdited: newMessage.isEdited,
-            isDeleted: newMessage.isDeleted
-          },
+          message: `${
+            messageType.charAt(0).toUpperCase() + messageType.slice(1)
+          } message sent successfully`,
+          data: newMessage,
         });
       } catch (error) {
         console.error(`[SOCKET] Error sending message:`, error);
@@ -359,6 +404,95 @@ const socketHandler = (io) => {
       }
     });
 
+    // Handle mark chat as read
+    socket.on("mark-chat-read", async (data, callback) => {
+      try {
+        const { chatId } = data;
+
+        if (!chatId) {
+          return callback?.({
+            success: false,
+            message: "chatId is required",
+          });
+        }
+
+        // Find the chat and verify user is participant
+        const chat = await Chat.findById(chatId);
+        if (!chat || !chat.participants.some((p) => p.equals(socket.user._id))) {
+          return callback?.({
+            success: false,
+            message: "Unauthorized to mark this chat as read",
+          });
+        }
+
+        // Get current unread count before resetting
+        const previousUnreadCount = chat.getUnreadCount(socket.user._id);
+
+        // Reset unread count for this user
+        chat.resetUnreadCount(socket.user._id);
+        await chat.save();
+
+        // Mark all unread messages in this chat as read by this user
+        await Message.updateMany(
+          {
+            chat: chatId,
+            "readBy.user": { $ne: socket.user._id },
+          },
+          {
+            $push: {
+              readBy: {
+                user: socket.user._id,
+                readAt: new Date(),
+              },
+            },
+          }
+        );
+
+        // Broadcast to the chat room that messages have been read
+        socket.to(chatId).emit("chat-marked-read", {
+          chatId: chatId,
+          readBy: {
+            userId: socket.userId,
+            fullName: socket.user.fullName,
+            readAt: new Date(),
+          },
+          previousUnreadCount: previousUnreadCount,
+        });
+
+        // Broadcast unread count update to user's personal room
+        socket.emit("unread-count-updated", {
+          chatId: chatId,
+          unreadCount: 0,
+          previousCount: previousUnreadCount,
+          timestamp: new Date(),
+        });
+
+        // Trigger contacts refresh for real-time UI update
+        socket.emit("refresh-contacts-needed");
+
+        console.log(
+          `[SOCKET] User ${socket.user.fullName} marked chat ${chatId} as read (${previousUnreadCount} messages)`
+        );
+
+        callback?.({
+          success: true,
+          message: "Chat marked as read successfully",
+          data: {
+            chatId: chatId,
+            previousUnreadCount: previousUnreadCount,
+            newUnreadCount: 0,
+          },
+        });
+      } catch (error) {
+        console.error(`[SOCKET] Error marking chat as read:`, error);
+        callback?.({
+          success: false,
+          message: "Failed to mark chat as read",
+          error: error.message,
+        });
+      }
+    });
+
     // Handle online/offline status
     socket.on("user-online", (callback) => {
       // Broadcast to all user's chats that they are online
@@ -382,14 +516,17 @@ const socketHandler = (io) => {
     });
 
     // Handle contact list refresh request
-    socket.on("refresh-contacts", (callback) => {
-      // This event is handled by the client to trigger a contacts API call
-      // The server acknowledges the request
-      if (callback) {
-        callback({
-          success: true,
-          message: "Contact refresh acknowledged",
-        });
+    socket.on("refresh-contacts", async () => {
+      console.log("Contacts refresh triggered by socket");
+
+      const response = await fetch("/api/contacts", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setContacts(data.data);
       }
     });
 

@@ -251,6 +251,7 @@ const sendMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "text",
       content
     });
@@ -396,7 +397,7 @@ const getMessages = async (req, res) => {
         
         // Add read status for current user
         const currentUserRead = messageObj.readBy.find(read => 
-          read.user.toString() === req.user._id.toString()
+          read.user && read.user.toString() === req.user._id.toString()
         );
         messageObj.isReadByCurrentUser = !!currentUserRead;
         if (currentUserRead) {
@@ -465,6 +466,7 @@ const sendPhotoMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "image",
       imageUrl: result.url,
       fileName: result.filename,
@@ -549,6 +551,7 @@ const sendLocationMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "location",
       location: {
         latitude: lat,
@@ -641,6 +644,7 @@ const sendVideoMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "video",
       videoUrl: result.url,
       fileName: result.filename,
@@ -732,6 +736,7 @@ const sendDocumentMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "document",
       documentUrl: result.url,
       fileName: result.filename,
@@ -823,6 +828,7 @@ const sendAudioMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "audio",
       audioUrl: result.url,
       fileName: result.filename,
@@ -973,6 +979,7 @@ const forwardMessage = async (req, res) => {
     const newMessage = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: sourceMessage.messageType,
       content: sourceMessage.content,
       imageUrl: sourceMessage.imageUrl,
