@@ -28,7 +28,8 @@ const {
   completeProfileDetails,
   uploadIdDocument,
   finalizeProfileSetup,
-  getSetupStatus
+  getSetupStatus,
+  verifyVisitRequest
 } = require("../controllers/ownerController");
 const { auth, requireUserType } = require("../middleware/auth");
 const upload = require("../middleware/upload");
@@ -77,6 +78,9 @@ router.delete("/property/:preferredTenantId/preferred-tenants", deletePreferredT
 // Visit Requests
 router.get("/visit-requests", getVisitRequests);
 router.patch("/visit-requests/:requestId", updateVisitRequest);
+
+// verify Visit - OTP Verification
+router.post("/visit-requests/:requestId/verify", verifyVisitRequest);
 
 // Visit Request Reschedule Actions From Tenant
 router.patch(

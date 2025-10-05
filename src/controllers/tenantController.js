@@ -10,6 +10,7 @@ const {
   getPredefinedResponse,
   getChatbotResponse,
 } = require("../utils/faqService");
+const { verifyOTP } = require("../utils/emailService");
 // Get Profile
 const getProfile = async (req, res) => {
   try {
@@ -532,10 +533,7 @@ const rescheduleRequest = async (req, res) => {
       });
     }
 
-    const visit = await VisitRequest.findById(requestId).populate(
-      "property",
-      "tenant"
-    );
+    const visit = await VisitRequest.findById(requestId).populate("property");
 
     if (!visit) {
       return res.status(404).json({
@@ -551,11 +549,60 @@ const rescheduleRequest = async (req, res) => {
       });
     }
 
+    // Get property with landlord schedule
+    const propertyDoc = await Property.findById(visit.property);
+    if (!propertyDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    // Check if landlord has set up their schedule
+    if (!propertyDoc.landlordSchedule) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Landlord has not set up their availability schedule for this property.",
+      });
+    }
+
+    const { scheduledDate: landlordDate, slots: landlordSlots } =
+      propertyDoc.landlordSchedule;
+
+    // Convert dates to compare
+    const requestedDate = new Date(scheduledDate);
+    requestedDate.setHours(0, 0, 0, 0);
+
+    const availableDate = new Date(landlordDate);
+    availableDate.setHours(0, 0, 0, 0);
+
+    // Check if the requested date matches landlord's available date
+    if (requestedDate.getTime() !== availableDate.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: `Visit can only be rescheduled to ${availableDate.toDateString()}. Please select from the landlord's available dates.`,
+      });
+    }
+
+    // Extract available time slots from landlord's schedule
+    const availableTimeSlots = landlordSlots.map((slot) => slot.scheduledTime);
+    const requestedTimeSlots = slots.map((slot) => slot.scheduledTime);
+    const invalidSlots = requestedTimeSlots.filter(
+      (time) => !availableTimeSlots.includes(time)
+    );
+
+    if (invalidSlots.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `The following time slots are not available: ${invalidSlots.join(
+          ", "
+        )}. Available slots are: ${availableTimeSlots.join(", ")}`,
+      });
+    }
+
     const startOfDay = new Date(scheduledDate);
     startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(scheduledDate);
-    endOfDay.setHours(23, 59, 59, 999);
 
     const newSlots = slots?.length ? slots : [{ scheduledTime: time }];
     const scheduledTimes = newSlots.map((s) => s.scheduledTime.trim());
@@ -575,6 +622,34 @@ const rescheduleRequest = async (req, res) => {
         success: false,
         message:
           "Same Date Same slot again can not Reschedule. Please choose a different time.",
+      });
+    }
+
+    // Check if any of the requested slots are already booked by other tenants
+    const conflictingVisits = await VisitRequest.find({
+      property: visit.property,
+      scheduledDate: startOfDay,
+      slots: {
+        $elemMatch: {
+          scheduledTime: { $in: requestedTimeSlots },
+        },
+      },
+      status: { $in: ["pending", "scheduled", "landlord_approved"] },
+      _id: { $ne: requestId }, // Exclude current visit request
+    });
+
+    if (conflictingVisits.length > 0) {
+      const bookedSlots = conflictingVisits.flatMap((visit) =>
+        visit.slots
+          .filter((slot) => requestedTimeSlots.includes(slot.scheduledTime))
+          .map((slot) => slot.scheduledTime)
+      );
+
+      return res.status(409).json({
+        success: false,
+        message: `The following time slots are already booked: ${[
+          ...new Set(bookedSlots),
+        ].join(", ")}. Please choose different time slots.`,
       });
     }
 
@@ -1096,7 +1171,6 @@ const createscheduleVisitRequest = async (req, res) => {
     const tenantId = req.user._id;
     const { property, scheduledDate, slots, status, notes } = req.body;
     const propertyDoc = await Property.findById(property);
-    // console.log("propertyDoc", propertyDoc);
 
     if (!propertyDoc) {
       return res
@@ -1105,22 +1179,74 @@ const createscheduleVisitRequest = async (req, res) => {
     }
 
     const landlordId = propertyDoc?.owner;
-    console.log("landlordId", landlordId);
 
-    if (!tenantId || !property || !scheduledDate || !slots.length === 0) {
+    // Validate required fields
+    if (
+      !tenantId ||
+      !property ||
+      !scheduledDate ||
+      !slots ||
+      slots.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "property,scheduledDate, and scheduledTime are required",
+        message: "property, scheduledDate, and slots are required",
       });
     }
 
+    // Check if landlord has set up their schedule for this property
+    if (!propertyDoc.landlordSchedule) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Landlord has not set up their availability schedule for this property. Please contact the landlord.",
+      });
+    }
+
+    const { scheduledDate: landlordDate, slots: landlordSlots } =
+      propertyDoc.landlordSchedule;
+
+    // Convert dates to compare (normalize to just date, ignore time)
+    const requestedDate = new Date(scheduledDate);
+    requestedDate.setHours(0, 0, 0, 0);
+
+    const availableDate = new Date(landlordDate);
+    availableDate.setHours(0, 0, 0, 0);
+
+    // Check if the requested date matches landlord's available date
+    if (requestedDate.getTime() !== availableDate.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: `Visit can only be scheduled on ${availableDate.toDateString()}. Please select from the landlord's available dates.`,
+      });
+    }
+
+    // Extract available time slots from landlord's schedule
+    const availableTimeSlots = landlordSlots.map((slot) => slot.scheduledTime);
+
+    // Check if all requested time slots are available in landlord's schedule
+    const requestedTimeSlots = slots.map((slot) => slot.scheduledTime);
+    const invalidSlots = requestedTimeSlots.filter(
+      (time) => !availableTimeSlots.includes(time)
+    );
+
+    if (invalidSlots.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `The following time slots are not available: ${invalidSlots.join(
+          ", "
+        )}. Available slots are: ${availableTimeSlots.join(", ")}`,
+      });
+    }
+
+    // Check for existing visit requests for the same property, date, and time slots
     const existingSlot = await VisitRequest.findOne({
       tenant: tenantId,
       property,
       scheduledDate,
       slots: {
         $elemMatch: {
-          scheduledTime: { $in: slots.map((s) => s.scheduledTime) },
+          scheduledTime: { $in: requestedTimeSlots },
         },
       },
       status: { $in: ["pending", "scheduled"] },
@@ -1133,6 +1259,34 @@ const createscheduleVisitRequest = async (req, res) => {
       });
     }
 
+    // Check if any of the requested slots are already booked by other tenants
+    const conflictingVisits = await VisitRequest.find({
+      property,
+      scheduledDate,
+      slots: {
+        $elemMatch: {
+          scheduledTime: { $in: requestedTimeSlots },
+        },
+      },
+      status: { $in: ["pending", "scheduled", "landlord_approved"] },
+      tenant: { $ne: tenantId }, // Exclude current tenant
+    });
+
+    if (conflictingVisits.length > 0) {
+      const bookedSlots = conflictingVisits.flatMap((visit) =>
+        visit.slots
+          .filter((slot) => requestedTimeSlots.includes(slot.scheduledTime))
+          .map((slot) => slot.scheduledTime)
+      );
+
+      return res.status(409).json({
+        success: false,
+        message: `The following time slots are already booked: ${[
+          ...new Set(bookedSlots),
+        ].join(", ")}. Please choose different time slots.`,
+      });
+    }
+
     const visitRequest = await VisitRequest.create({
       tenant: tenantId,
       landlord: landlordId,
@@ -1140,7 +1294,7 @@ const createscheduleVisitRequest = async (req, res) => {
       scheduledDate,
       slots,
       notes,
-      status: status,
+      status: status || "pending",
     });
 
     return res.status(201).json({
