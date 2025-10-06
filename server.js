@@ -1,9 +1,9 @@
-const express = require('express');
+﻿const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const morgan = require('morgan');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit'); // DISABLED
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const { createServer } = require('http');
@@ -64,7 +64,7 @@ const limiter = rateLimit({
 app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
-app.use(limiter);
+// app.use(limiter); // COMPLETELY DISABLED - NO RATE LIMITING
 app.use(morgan('combined'));
 
 // Enhanced CORS configuration
@@ -195,3 +195,4 @@ mongoose.connect(process.env.MONGO_URI, {
     console.error('Database connection error:', err);
     process.exit(1);
   });
+
