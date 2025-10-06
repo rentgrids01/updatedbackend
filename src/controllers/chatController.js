@@ -1,118 +1,8 @@
 const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
 const Owner = require('../models/Owner');
-
-// Define Chat and Message schemas inline to avoid loading issues
-const chatSchema = new mongoose.Schema({
-  participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    required: true
-  }],
-  isGroupChat: {
-    type: Boolean,
-    default: false
-  },
-  chatName: String,
-  lastMessage: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  },
-  lastActivity: {
-    type: Date,
-    default: Date.now
-  },
-  unreadCount: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId
-    },
-    count: {
-      type: Number,
-      default: 0
-    }
-  }],
-  mutedBy: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId
-    },
-    mutedUntil: {
-      type: Date,
-      default: null
-    }
-  }],
-  archivedBy: [{
-    type: mongoose.Schema.Types.ObjectId
-  }]
-}, {
-  timestamps: true
-});
-
-const messageSchema = new mongoose.Schema({
-  chat: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Chat',
-    required: true
-  },
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true
-  },
-  messageType: {
-    type: String,
-    enum: ['text', 'image', 'location', 'document', 'video', 'audio'],
-    default: 'text'
-  },
-  content: String,
-  imageUrl: String,
-  documentUrl: String,
-  videoUrl: String,
-  audioUrl: String,
-  fileName: String,
-  fileSize: Number,
-  fileMimeType: String,
-  location: {
-    latitude: Number,
-    longitude: Number,
-    address: String
-  },
-  readBy: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId
-    },
-    readAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  isEdited: {
-    type: Boolean,
-    default: false
-  },
-  originalContent: String,
-  forwardedFrom: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false
-  }
-}, {
-  timestamps: true
-});
-
-// Get or create models
-let Chat, Message;
-try {
-  Chat = mongoose.model('Chat');
-} catch (error) {
-  Chat = mongoose.model('Chat', chatSchema);
-}
-
-try {
-  Message = mongoose.model('Message');
-} catch (error) {
-  Message = mongoose.model('Message', messageSchema);
-}
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 
 // Test Chat Model (for debugging)
 const testChatModel = async (req, res) => {
@@ -492,6 +382,9 @@ const markChatAsRead = async (req, res) => {
       });
     }
 
+    // Get current unread count before resetting
+    const previousUnreadCount = chat.getUnreadCount(req.user._id);
+
     // Reset unread count for this user
     const unreadIndex = chat.unreadCount.findIndex(
       uc => uc.user.toString() === req.user._id.toString()
@@ -508,9 +401,53 @@ const markChatAsRead = async (req, res) => {
 
     await chat.save();
 
+    // Mark all unread messages in this chat as read by this user
+    await Message.updateMany(
+      {
+        chat: chatId,
+        "readBy.user": { $ne: req.user._id }
+      },
+      {
+        $push: {
+          readBy: {
+            user: req.user._id,
+            readAt: new Date()
+          }
+        }
+      }
+    );
+
+    // Emit socket event if io is available (for real-time updates)
+    const io = req.app.get('io');
+    if (io) {
+      // Broadcast to the chat room that messages have been read
+      io.to(chatId).emit("chat-marked-read", {
+        chatId: chatId,
+        readBy: {
+          userId: req.user._id.toString(),
+          fullName: req.user.fullName,
+          readAt: new Date(),
+        },
+        previousUnreadCount: previousUnreadCount,
+      });
+
+      // Broadcast unread count update to user's personal room
+      io.to(req.user._id.toString()).emit("unread-count-updated", {
+        chatId: chatId,
+        unreadCount: 0,
+        previousCount: previousUnreadCount,
+        timestamp: new Date(),
+      });
+    }
+
     res.json({
       success: true,
-      message: 'Chat marked as read'
+      message: 'Chat marked as read',
+      data: {
+        chatId: chatId,
+        previousUnreadCount: previousUnreadCount,
+        newUnreadCount: 0
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -713,6 +650,149 @@ const unarchiveChat = async (req, res) => {
   }
 };
 
+// Get Contacts (All possible chat partners with their chat info if exists)
+const getContacts = async (req, res) => {
+  try {
+    // Validate user ID
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
+    // Determine user type and get appropriate contacts
+    const currentUser = await Tenant.findById(req.user._id) || await Owner.findById(req.user._id);
+    
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    let potentialContacts = [];
+    
+    // If current user is tenant, get all owners
+    if (currentUser.userType === 'tenant') {
+      potentialContacts = await Owner.find({}).select('_id');
+    } 
+    // If current user is owner, get all tenants
+    else if (currentUser.userType === 'owner') {
+      potentialContacts = await Tenant.find({}).select('_id');
+    }
+
+    // Get all chats for the current user with populated lastMessage
+    const userChats = await Chat.find({
+      participants: req.user._id
+    }).populate('lastMessage').sort({ lastActivity: -1 });
+
+    // Create a map of userId to chat for quick lookup
+    const chatMap = new Map();
+    userChats.forEach(chat => {
+      const otherParticipant = chat.participants.find(p => p.toString() !== req.user._id.toString());
+      if (otherParticipant) {
+        chatMap.set(otherParticipant.toString(), chat);
+      }
+    });
+
+    // Import createContactObject helper from messageController
+    const { createContactObject } = require('./messageController');
+
+    // Build contacts list
+    const contactsWithChats = [];
+    const contactsWithoutChats = [];
+
+    for (const contact of potentialContacts) {
+      const contactId = contact._id.toString();
+      const chat = chatMap.get(contactId);
+      
+      if (chat) {
+        // Contact with existing chat
+        const contactObj = await createContactObject(contact._id, chat, req.user._id, req);
+        if (contactObj) {
+          contactObj.sortDate = chat.lastActivity;
+          contactsWithChats.push(contactObj);
+        }
+      } else {
+        // Contact without chat
+        const contactObj = await createContactObject(contact._id, null, req.user._id, req);
+        if (contactObj) {
+          contactObj.sortDate = new Date(0); // Very old date for sorting
+          contactsWithoutChats.push(contactObj);
+        }
+      }
+    }
+
+    // Sort contacts with chats by lastActivity (most recent first)
+    contactsWithChats.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+
+    // Sort contacts without chats alphabetically
+    contactsWithoutChats.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+    // Combine lists: contacts with chats first, then contacts without chats
+    const allContacts = [...contactsWithChats, ...contactsWithoutChats];
+
+    // Remove temporary sortDate field
+    const cleanedContacts = allContacts.map(contact => {
+      const { sortDate, ...contactWithoutSort } = contact;
+      return contactWithoutSort;
+    });
+
+    res.json({
+      success: true,
+      data: cleanedContacts
+    });
+  } catch (error) {
+    console.error('Get contacts error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Get Total Unread Count
+const getTotalUnreadCount = async (req, res) => {
+  try {
+    const chats = await Chat.find({
+      participants: req.user._id
+    }).select('unreadCount');
+
+    let totalUnreadCount = 0;
+    let chatCounts = [];
+
+    chats.forEach(chat => {
+      const unreadEntry = chat.unreadCount.find(
+        entry => entry.user && entry.user.toString() === req.user._id.toString()
+      );
+      const count = unreadEntry ? unreadEntry.count : 0;
+      totalUnreadCount += count;
+      
+      if (count > 0) {
+        chatCounts.push({
+          chatId: chat._id,
+          unreadCount: count
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalUnreadCount,
+        chatCounts,
+        totalChats: chats.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllChats,
   getChatDetails,
@@ -725,5 +805,7 @@ module.exports = {
   muteChat,
   unmuteChat,
   archiveChat,
-  unarchiveChat
+  unarchiveChat,
+  getContacts,
+  getTotalUnreadCount
 };

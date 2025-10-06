@@ -393,6 +393,8 @@ const finalizeProfileSetup = async (req, res) => {
     const { profileComplete } = req.body;
     const tenantId = req.user._id;
 
+    console.log('Finalizing profile setup:', { setupId, tenantId, profileComplete });
+
     const profileSetup = await ProfileSetup.findOne({
       setupId,
       tenant: tenantId,
@@ -400,43 +402,79 @@ const finalizeProfileSetup = async (req, res) => {
     });
 
     if (!profileSetup) {
+      console.log('Profile setup not found or already completed');
       return res.status(404).json({
         success: false,
         message: "Profile setup not found or already completed"
       });
     }
 
+    console.log('Found profile setup:', profileSetup.setupId);
+
     if (profileComplete) {
+      // Advance to finalization step
       profileSetup.advanceStep("FINALIZATION");
       await profileSetup.save();
+      
+      console.log('Advanced to finalization step, progress:', profileSetup.progress);
 
-      // Update or create tenant profile
-      let tenantProfile = await TenantProfile.findOne({ tenant: tenantId });
+      // Update or create tenant profile - Note: TenantProfile uses 'userId' field
+      let tenantProfile = await TenantProfile.findOne({ userId: tenantId });
+      
+      console.log('Existing tenant profile found:', !!tenantProfile);
       
       if (tenantProfile) {
         // Update existing profile
-        Object.assign(tenantProfile, {
-          fullName: profileSetup.personalDetails.fullName,
-          email: profileSetup.personalDetails.email,
-          phoneNumber: profileSetup.personalDetails.contact,
-          dateOfBirth: profileSetup.personalDetails.dateOfBirth,
-          age: profileSetup.personalDetails.age,
-          profilePhoto: profileSetup.profilePhoto?.imagePath || profileSetup.avatar?.imageUrl
-        });
+        const updateData = {};
+        
+        if (profileSetup.personalDetails?.fullName) {
+          updateData.fullName = profileSetup.personalDetails.fullName;
+        }
+        if (profileSetup.personalDetails?.email) {
+          updateData.email = profileSetup.personalDetails.email;
+        }
+        if (profileSetup.personalDetails?.contact) {
+          updateData.phoneNumber = profileSetup.personalDetails.contact;
+        }
+        if (profileSetup.personalDetails?.dateOfBirth) {
+          updateData.dob = profileSetup.personalDetails.dateOfBirth;
+        }
+        if (profileSetup.personalDetails?.age) {
+          updateData['personalDetails.age'] = profileSetup.personalDetails.age;
+        }
+        if (profileSetup.profilePhoto?.imagePath || profileSetup.avatar?.imageUrl) {
+          updateData.profilePhoto = profileSetup.profilePhoto?.imagePath || profileSetup.avatar?.imageUrl;
+        }
+        
+        updateData.isProfileComplete = true;
+        updateData.updatedAt = new Date();
+        
+        Object.assign(tenantProfile, updateData);
+        console.log('Updating tenant profile with:', updateData);
       } else {
-        // Create new profile
+        // Create new profile - using correct field name 'userId'
         tenantProfile = new TenantProfile({
-          tenant: tenantId,
-          fullName: profileSetup.personalDetails.fullName,
-          email: profileSetup.personalDetails.email,
-          phoneNumber: profileSetup.personalDetails.contact,
-          dateOfBirth: profileSetup.personalDetails.dateOfBirth,
-          age: profileSetup.personalDetails.age,
-          profilePhoto: profileSetup.profilePhoto?.imagePath || profileSetup.avatar?.imageUrl
+          userId: tenantId, // Correct field name
+          fullName: profileSetup.personalDetails?.fullName,
+          email: profileSetup.personalDetails?.email,
+          phoneNumber: profileSetup.personalDetails?.contact,
+          dob: profileSetup.personalDetails?.dateOfBirth,
+          personalDetails: {
+            age: profileSetup.personalDetails?.age
+          },
+          profilePhoto: profileSetup.profilePhoto?.imagePath || profileSetup.avatar?.imageUrl,
+          isProfileComplete: true
         });
+        console.log('Creating new tenant profile');
       }
 
-      await tenantProfile.save();
+      try {
+        await tenantProfile.save();
+        console.log('Tenant profile saved successfully');
+      } catch (profileSaveError) {
+        console.error('Error saving tenant profile:', profileSaveError);
+        // Continue with the response even if profile save fails
+      }
     }
 
     res.json({

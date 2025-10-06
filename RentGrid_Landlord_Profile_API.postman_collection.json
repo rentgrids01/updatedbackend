@@ -1,0 +1,1312 @@
+{
+	"info": {
+		"_postman_id": "rentgrid-landlord-profile-api",
+		"name": "RentGrid Landlord Profile & Setup API",
+		"description": "Complete landlord/owner profile setup and document management API for RentGrid. All endpoints require owner authentication.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": {
+			"major": 1,
+			"minor": 0,
+			"patch": 0
+		}
+	},
+	"item": [
+		{
+			"name": "🚀 Multi-Step Profile Setup",
+			"description": "Complete profile setup workflow with step-by-step progress tracking",
+			"item": [
+				{
+					"name": "1. Initialize Profile Setup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"landlord@example.com\",\n  \"fullName\": \"John Smith\",\n  \"contact\": \"9876543210\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/initialize",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "initialize"]
+						},
+						"description": "Initialize the profile setup process. Returns a setupId that will be used in subsequent steps."
+					}
+				},
+				{
+					"name": "2. Save Personal Details",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Smith\",\n  \"email\": \"landlord@example.com\",\n  \"contact\": \"9876543210\",\n  \"dateOfBirth\": \"15/03/1980\",\n  \"age\": \"44\",\n  \"propertyType\": \"apartment\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/personal-details",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "personal-details"]
+						},
+						"description": "Save personal details including name, contact, date of birth, and property preferences."
+					}
+				},
+				{
+					"name": "3. Select Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"selectedAvatar\": 2,\n  \"uploadedImage\": null,\n  \"isUploading\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/avatar",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "avatar"]
+						},
+						"description": "Select a pre-defined avatar or specify an uploaded custom avatar image."
+					}
+				},
+				{
+					"name": "4. Upload Profile Photo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "uploadedImage",
+									"type": "file",
+									"description": "Profile photo image file (JPG, PNG, max 5MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/photo",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "photo"]
+						},
+						"description": "Upload a custom profile photo. Supports JPG, PNG formats up to 5MB."
+					}
+				},
+				{
+					"name": "5. Complete Profile Details",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Smith\",\n  \"email\": \"landlord@example.com\",\n  \"contact\": \"9876543210\",\n  \"dateOfBirth\": \"15/03/1980\",\n  \"age\": \"44\",\n  \"selectedAvatar\": 2,\n  \"uploadedImage\": null,\n  \"propertyType\": \"apartment\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/complete-profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "complete-profile"]
+						},
+						"description": "Complete the profile details step by confirming all personal information and avatar selection."
+					}
+				},
+				{
+					"name": "6. Upload ID Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "uploadedIdFile",
+									"type": "file",
+									"description": "ID document file (PDF, JPG, PNG, max 10MB)"
+								},
+								{
+									"key": "idFileName",
+									"value": "John_Aadhar_Card.pdf",
+									"type": "text",
+									"description": "Custom filename for the document"
+								},
+								{
+									"key": "documentType",
+									"value": "AADHAR",
+									"type": "text",
+									"description": "Document type: AADHAR, PAN, DRIVING_LICENSE, PASSPORT"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/id-document",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "id-document"]
+						},
+						"description": "Upload identity documents like Aadhar, PAN, Driving License, or Passport for verification."
+					}
+				},
+				{
+					"name": "7. Finalize Profile Setup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"profileComplete\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/finalize",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "finalize"]
+						},
+						"description": "Finalize the profile setup process and mark it as complete."
+					}
+				},
+				{
+					"name": "8. Get Setup Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/setup/{{setupId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "setup", "{{setupId}}", "status"]
+						},
+						"description": "Get the current status of the profile setup process including progress, completed steps, and remaining tasks."
+					}
+				}
+			]
+		},
+		{
+			"name": "📄 Document Management",
+			"description": "Upload, manage, and delete landlord documents with full CRUD operations",
+			"item": [
+				{
+					"name": "Get All Documents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents?page=1&limit=10&documentType=AADHAR&verificationStatus=pending",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number for pagination"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Number of documents per page"
+								},
+								{
+									"key": "documentType",
+									"value": "AADHAR",
+									"description": "Filter by document type: AADHAR, PAN, DRIVING_LICENSE, PASSPORT, etc."
+								},
+								{
+									"key": "verificationStatus",
+									"value": "pending",
+									"description": "Filter by verification status: pending, verified, rejected, expired"
+								}
+							]
+						},
+						"description": "Retrieve all documents uploaded by the landlord with optional filtering and pagination."
+					}
+				},
+				{
+					"name": "Upload New Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "Document file to upload (PDF, JPG, PNG, max 10MB)"
+								},
+								{
+									"key": "documentType",
+									"value": "PROPERTY_DEED",
+									"type": "text",
+									"description": "Type of document: AADHAR, PAN, DRIVING_LICENSE, PASSPORT, PROPERTY_DEED, PROPERTY_TAX, RENTAL_AGREEMENT, OTHER"
+								},
+								{
+									"key": "documentName",
+									"value": "Property Deed - Apartment 101",
+									"type": "text",
+									"description": "Custom name for the document"
+								},
+								{
+									"key": "tags",
+									"value": "property,legal,ownership",
+									"type": "text",
+									"description": "Comma-separated tags for organizing documents"
+								},
+								{
+									"key": "expiryDate",
+									"value": "2030-12-31",
+									"type": "text",
+									"description": "Document expiry date (YYYY-MM-DD format, optional)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"]
+						},
+						"description": "Upload a new document with metadata including document type, custom name, tags, and optional expiry date."
+					}
+				},
+				{
+					"name": "Update Document Details",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"documentName\": \"Updated Property Deed - Apartment 101\",\n  \"documentType\": \"PROPERTY_DEED\",\n  \"tags\": \"property,legal,ownership,updated\",\n  \"expiryDate\": \"2035-12-31\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents/{{documentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents", "{{documentId}}"]
+						},
+						"description": "Update document metadata including name, type, tags, and expiry date. The actual file cannot be changed - upload a new document instead."
+					}
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents/{{documentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents", "{{documentId}}"]
+						},
+						"description": "Permanently delete a document. This action cannot be undone and will remove both the file and database record."
+					}
+				}
+			]
+		},
+		{
+			"name": "📋 Document Examples",
+			"description": "Real-world examples of different document types and use cases for landlords",
+			"item": [
+				{
+					"name": "Upload Aadhar Card",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "Aadhar card PDF or image file"
+								},
+								{
+									"key": "documentType",
+									"value": "AADHAR",
+									"type": "text"
+								},
+								{
+									"key": "documentName",
+									"value": "John Smith - Aadhar Card",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "identity,government,primary",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"]
+						},
+						"description": "Upload Aadhar card for identity verification."
+					}
+				},
+				{
+					"name": "Upload PAN Card",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "PAN card PDF or image file"
+								},
+								{
+									"key": "documentType",
+									"value": "PAN",
+									"type": "text"
+								},
+								{
+									"key": "documentName",
+									"value": "John Smith - PAN Card",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "tax,identity,permanent",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"]
+						},
+						"description": "Upload PAN card for tax and identity verification."
+					}
+				},
+				{
+					"name": "Upload Property Deed",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "Property deed or ownership document PDF"
+								},
+								{
+									"key": "documentType",
+									"value": "PROPERTY_DEED",
+									"type": "text"
+								},
+								{
+									"key": "documentName",
+									"value": "Property Deed - 123 Main Street Apartment",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "property,ownership,legal",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"]
+						},
+						"description": "Upload property deed for ownership verification."
+					}
+				},
+				{
+					"name": "Upload Property Tax Receipt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "Property tax receipt PDF"
+								},
+								{
+									"key": "documentType",
+									"value": "PROPERTY_TAX",
+									"type": "text"
+								},
+								{
+									"key": "documentName",
+									"value": "Property Tax Receipt - 2024",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "tax,property,annual",
+									"type": "text"
+								},
+								{
+									"key": "expiryDate",
+									"value": "2025-03-31",
+									"type": "text",
+									"description": "Tax receipts are valid for the financial year"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"]
+						},
+						"description": "Upload property tax receipt for property verification."
+					}
+				},
+				{
+					"name": "Upload Rental Agreement Template",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "Rental agreement template PDF"
+								},
+								{
+									"key": "documentType",
+									"value": "RENTAL_AGREEMENT",
+									"type": "text"
+								},
+								{
+									"key": "documentName",
+									"value": "Standard Rental Agreement Template",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "legal,rental,template",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "documents"]
+						},
+						"description": "Upload rental agreement template for tenant applications."
+					}
+				}
+			]
+		},
+		{
+			"name": "👤 Legacy Profile APIs",
+			"description": "Existing profile management endpoints (backward compatibility)",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile"]
+						},
+						"description": "Get the current landlord profile information."
+					}
+				},
+				{
+					"name": "Create Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Smith\",\n  \"email\": \"landlord@example.com\",\n  \"phoneNumber\": \"9876543210\",\n  \"dateOfBirth\": \"1980-03-15\",\n  \"propertiesOwned\": 3,\n  \"experience\": \"5 years\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile"]
+						},
+						"description": "Create a new landlord profile with basic information."
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Smith\",\n  \"phoneNumber\": \"9876543210\",\n  \"propertiesOwned\": 5,\n  \"experience\": \"7 years\",\n  \"preferences\": {\n    \"tenantType\": \"professional\",\n    \"rentalRange\": {\n      \"min\": 15000,\n      \"max\": 50000\n    },\n    \"location\": \"Mumbai\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile"]
+						},
+						"description": "Update existing landlord profile information."
+					}
+				},
+				{
+					"name": "Upload Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"avatarId\": 3\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/avatar",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "avatar"]
+						},
+						"description": "Set a pre-defined avatar for the landlord profile."
+					}
+				},
+				{
+					"name": "Upload Profile Photo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "photo",
+									"type": "file",
+									"description": "Profile photo file (JPG, PNG, max 5MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/profile/photo",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "profile", "photo"]
+						},
+						"description": "Upload a custom profile photo for the landlord."
+					}
+				}
+			]
+		},
+		{
+			"name": "🏠 Property Management",
+			"description": "Landlord-specific property and tenant management endpoints",
+			"item": [
+				{
+					"name": "Get Dashboard",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/dashboard",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "dashboard"]
+						},
+						"description": "Get landlord dashboard with properties, visit requests, and tenant applications overview."
+					}
+				},
+				{
+					"name": "Get Visit Requests",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/visit-requests?status=pending&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "visit-requests"],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending",
+									"description": "Filter by status: pending, approved, rejected, completed"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number for pagination"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Number of requests per page"
+								}
+							]
+						},
+						"description": "Get all visit requests for landlord's properties with filtering and pagination."
+					}
+				},
+				{
+					"name": "Update Visit Request",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"approved\",\n  \"visitDate\": \"2024-01-15\",\n  \"visitTime\": \"14:30\",\n  \"notes\": \"Please bring valid ID for verification\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/visit-requests/{{requestId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "visit-requests", "{{requestId}}"]
+						},
+						"description": "Update visit request status and schedule details."
+					}
+				},
+				{
+					"name": "Accept Reschedule Request",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notes\": \"Reschedule request accepted\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/visit-requests/{{requestId}}/accept-reschedule",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "visit-requests", "{{requestId}}", "accept-reschedule"]
+						},
+						"description": "Accept a reschedule request from tenant."
+					}
+				},
+				{
+					"name": "Reject Reschedule Request",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Original time slot is more convenient\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/visit-requests/{{requestId}}/reject-reschedule",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "visit-requests", "{{requestId}}", "reject-reschedule"]
+						},
+						"description": "Reject a reschedule request from tenant."
+					}
+				},
+				{
+					"name": "Reschedule Visit",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"newDate\": \"2024-01-16\",\n  \"newTime\": \"10:00\",\n  \"reason\": \"Owner schedule conflict\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/visit-requests/{{requestId}}/reschedule",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "visit-requests", "{{requestId}}", "reschedule"]
+						},
+						"description": "Initiate a reschedule request for a visit."
+					}
+				}
+			]
+		},
+		{
+			"name": "👥 Preferred Tenants",
+			"description": "Manage preferred tenant criteria and applications",
+			"item": [
+				{
+					"name": "Create Preferred Tenant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenantType\": \"professional\",\n  \"minIncome\": 50000,\n  \"maxOccupants\": 2,\n  \"petPolicy\": \"no_pets\",\n  \"smokingPolicy\": \"no_smoking\",\n  \"preferredAge\": {\n    \"min\": 25,\n    \"max\": 45\n  },\n  \"occupation\": [\"IT\", \"Healthcare\", \"Finance\"],\n  \"additionalRequirements\": \"Vegetarian preferred\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/property/{{propertyId}}/preferred-tenants",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "property", "{{propertyId}}", "preferred-tenants"]
+						},
+						"description": "Create preferred tenant criteria for a specific property."
+					}
+				},
+				{
+					"name": "Get Preferred Tenants",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/property/{{propertyId}}/preferred-tenants",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "property", "{{propertyId}}", "preferred-tenants"]
+						},
+						"description": "Get preferred tenant criteria for a specific property."
+					}
+				},
+				{
+					"name": "Update Preferred Tenant",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenantType\": \"professional\",\n  \"minIncome\": 60000,\n  \"maxOccupants\": 3,\n  \"petPolicy\": \"cats_allowed\",\n  \"preferredAge\": {\n    \"min\": 25,\n    \"max\": 50\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/property/{{propertyId}}/preferred-tenants/{{preferredTenantId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "property", "{{propertyId}}", "preferred-tenants", "{{preferredTenantId}}"]
+						},
+						"description": "Update preferred tenant criteria for a property."
+					}
+				},
+				{
+					"name": "Delete Preferred Tenant",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ownerToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/owner/property/{{preferredTenantId}}/preferred-tenants",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "owner", "property", "{{preferredTenantId}}", "preferred-tenants"]
+						},
+						"description": "Delete preferred tenant criteria for a property."
+					}
+				}
+			]
+		},
+		{
+			"name": "🔐 Authentication",
+			"description": "Landlord authentication endpoints",
+			"item": [
+				{
+					"name": "Owner Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emailId\": \"landlord@example.com\",\n  \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/owner/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "owner", "login"]
+						},
+						"description": "Login as landlord/owner to get JWT token for authenticated endpoints."
+					}
+				},
+				{
+					"name": "Owner Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Smith\",\n  \"emailId\": \"landlord@example.com\",\n  \"password\": \"password123\",\n  \"phonenumber\": \"9876543210\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/owner/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "owner", "register"]
+						},
+						"description": "Register a new landlord/owner account."
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set dynamic values",
+					"const timestamp = new Date().getTime();",
+					"pm.globals.set('timestamp', timestamp);",
+					"",
+					"// Generate random IDs for testing",
+					"const randomSetupId = 'setup_' + timestamp + '_' + Math.random().toString(36).substr(2, 9);",
+					"pm.globals.set('randomSetupId', randomSetupId);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test scripts for all requests",
+					"pm.test('Response time is acceptable', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(10000);",
+					"});",
+					"",
+					"pm.test('Response has correct content type', function () {",
+					"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+					"});",
+					"",
+					"pm.test('Response has success property', function () {",
+					"    const responseJson = pm.response.json();",
+					"    pm.expect(responseJson).to.have.property('success');",
+					"});",
+					"",
+					"// Auto-extract setupId from initialize profile setup response",
+					"if (pm.request.url.toString().includes('/profile/setup/initialize') && pm.response.code === 201) {",
+					"    pm.test('Setup initialization returns setupId', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.data).to.have.property('setupId');",
+					"        pm.globals.set('setupId', responseJson.data.setupId);",
+					"    });",
+					"}",
+					"",
+					"// Auto-extract documentId from document upload response",
+					"if (pm.request.url.toString().includes('/documents') && pm.request.method === 'POST' && pm.response.code === 201) {",
+					"    pm.test('Document upload returns document ID', function () {",
+					"        const responseJson = pm.response.json();",
+					"        if (responseJson.data && responseJson.data._id) {",
+					"            pm.globals.set('documentId', responseJson.data._id);",
+					"        } else if (responseJson.data && responseJson.data.documentId) {",
+					"            pm.globals.set('documentId', responseJson.data.documentId);",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"// Test for owner authentication endpoints",
+					"if (pm.request.url.toString().includes('/auth/owner/login') && pm.response.code === 200) {",
+					"    pm.test('Login response contains token', function () {",
+					"        const responseJson = pm.response.json();",
+					"        pm.expect(responseJson.data).to.have.property('token');",
+					"        pm.globals.set('ownerToken', responseJson.data.token);",
+					"    });",
+					"}",
+					"",
+					"// Test profile setup progress tracking",
+					"if (pm.request.url.toString().includes('/profile/setup/') && pm.response.code === 200) {",
+					"    pm.test('Profile setup response has progress tracking', function () {",
+					"        const responseJson = pm.response.json();",
+					"        if (responseJson.data) {",
+					"            pm.expect(responseJson.data).to.have.property('progress');",
+					"            pm.expect(responseJson.data).to.have.property('currentStep');",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"// Test document management responses",
+					"if (pm.request.url.toString().includes('/documents')) {",
+					"    pm.test('Document response has proper structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        if (pm.response.code === 200 && responseJson.data) {",
+					"            if (Array.isArray(responseJson.data.documents)) {",
+					"                // List documents response",
+					"                pm.expect(responseJson.data).to.have.property('pagination');",
+					"            } else if (responseJson.data._id || responseJson.data.documentId) {",
+					"                // Single document response",
+					"                pm.expect(responseJson.data).to.have.property('documentType');",
+					"            }",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"// Test property management responses",
+					"if (pm.request.url.toString().includes('/visit-requests') || pm.request.url.toString().includes('/preferred-tenants')) {",
+					"    pm.test('Property management response has proper structure', function () {",
+					"        const responseJson = pm.response.json();",
+					"        if (pm.response.code === 200) {",
+					"            pm.expect(responseJson).to.have.property('success', true);",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"// Log responses for debugging",
+					"if (pm.response.code >= 400) {",
+					"    console.log('Error Response:', pm.response.json());",
+					"} else {",
+					"    console.log('Success Response:', pm.response.json());",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:7000",
+			"type": "string",
+			"description": "Base URL for the RentGrid API server"
+		},
+		{
+			"key": "ownerToken",
+			"value": "your-owner-jwt-token-here",
+			"type": "string",
+			"description": "JWT token for authenticated owner endpoints (auto-set after login)"
+		},
+		{
+			"key": "setupId",
+			"value": "setup_example_id",
+			"type": "string",
+			"description": "Profile setup ID (auto-set after initialization)"
+		},
+		{
+			"key": "documentId",
+			"value": "document_example_id",
+			"type": "string",
+			"description": "Document ID for update/delete operations (auto-set after upload)"
+		},
+		{
+			"key": "propertyId",
+			"value": "property_example_id",
+			"type": "string",
+			"description": "Property ID for property-specific operations"
+		},
+		{
+			"key": "requestId",
+			"value": "request_example_id",
+			"type": "string",
+			"description": "Visit request ID for visit management operations"
+		},
+		{
+			"key": "preferredTenantId",
+			"value": "preferred_tenant_example_id",
+			"type": "string",
+			"description": "Preferred tenant criteria ID"
+		}
+	]
+}

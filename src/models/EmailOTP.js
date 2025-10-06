@@ -12,8 +12,16 @@ const emailOTPSchema = new mongoose.Schema({
   },
   purpose: {
     type: String,
-    enum: ['verification', 'password-reset'],
+    enum: ['verification', 'password-reset','visit-verification'],
     default: 'verification'
+  },
+  relatedId: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: 'relatedModel'
+  },
+  relatedModel: {
+    type: String,
+    enum: ['VisitRequest', 'Tenant', 'Owner', 'Property'], 
   },
   expiresAt: {
     type: Date,

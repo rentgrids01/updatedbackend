@@ -1,43 +1,225 @@
 const mongoose = require('mongoose');
+const { saveFile } = require('../utils/fileUpload');
+const Tenant = require('../models/Tenant');
+const Owner = require('../models/Owner');
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 
-// Get models that were defined in chatController
-let Chat, Message;
-try {
-  Chat = mongoose.model('Chat');
-  Message = mongoose.model('Message');
-} catch (error) {
-  // If models don't exist, create them inline
-  const chatSchema = new mongoose.Schema({
-    participants: [{ type: mongoose.Schema.Types.ObjectId, required: true }],
-    isGroupChat: { type: Boolean, default: false },
-    chatName: String,
-    lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
-    lastActivity: { type: Date, default: Date.now },
-    unreadCount: [{ user: mongoose.Schema.Types.ObjectId, count: { type: Number, default: 0 } }],
-    mutedBy: [{ user: mongoose.Schema.Types.ObjectId, mutedUntil: Date }],
-    archivedBy: [mongoose.Schema.Types.ObjectId]
-  }, { timestamps: true });
+// Helper function to create contact object for a specific user
+const createContactObject = async (userId, chatData, currentUserId, req) => {
+  try {
+    // Get user details from either Tenant or Owner collection
+    let user = await Tenant.findById(userId).select('fullName phonenumber profilePhoto userType');
+    
+    if (!user) {
+      user = await Owner.findById(userId).select('fullName phonenumber profilePhoto userType');
+    }
+    
+    if (!user) {
+      return null;
+    }
 
-  const messageSchema = new mongoose.Schema({
-    chat: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
-    sender: { type: mongoose.Schema.Types.ObjectId, required: true },
-    messageType: { type: String, enum: ['text', 'image', 'location', 'document', 'video', 'audio'], default: 'text' },
-    content: String,
-    imageUrl: String, documentUrl: String, videoUrl: String, audioUrl: String,
-    fileName: String, fileSize: Number, fileMimeType: String,
-    location: { latitude: Number, longitude: Number, address: String },
-    readBy: [{ user: mongoose.Schema.Types.ObjectId, readAt: { type: Date, default: Date.now } }],
-    isEdited: { type: Boolean, default: false },
-    originalContent: String,
-    forwardedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
-    isDeleted: { type: Boolean, default: false }
-  }, { timestamps: true });
+    const contactObj = {
+      _id: user._id,
+      fullName: user.fullName,
+      phonenumber: user.phonenumber,
+      profilePhoto: user.profilePhoto,
+      userType: user.userType
+    };
 
-  Chat = mongoose.model('Chat', chatSchema);
-  Message = mongoose.model('Message', messageSchema);
-}
+    // Add full URL for profile photo
+    if (user.profilePhoto) {
+      contactObj.profilePhotoUrl = `${req.protocol}://${req.get('host')}${user.profilePhoto}`;
+    }
 
-// const { uploadToCloudinary } = require("../utils/cloudinary");
+    // Add chat information
+    if (chatData) {
+      // Get unread count for the current user
+      const unreadEntry = chatData.unreadCount.find(entry => 
+        entry.user.toString() === currentUserId.toString()
+      );
+
+      // Create lastMessage object with sender details
+      let lastMessageWithSender = null;
+      if (chatData.lastMessage) {
+        const lastMessage = chatData.lastMessage.toObject ? chatData.lastMessage.toObject() : chatData.lastMessage;
+        
+        if (lastMessage.sender) {
+          let sender = await Tenant.findById(lastMessage.sender).select('fullName phonenumber profilePhoto userType');
+          
+          if (!sender) {
+            sender = await Owner.findById(lastMessage.sender).select('fullName phonenumber profilePhoto userType');
+          }
+          
+          if (sender) {
+            lastMessageWithSender = {
+              ...lastMessage,
+              sender: {
+                _id: lastMessage.sender,
+                fullName: sender.fullName,
+                phonenumber: sender.phonenumber,
+                profilePhoto: sender.profilePhoto,
+                userType: sender.userType
+              }
+            };
+            
+            // Add full URL for sender profile photo
+            if (sender.profilePhoto) {
+              lastMessageWithSender.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+            }
+            
+            // Add full URLs for message media
+            if (lastMessage.imageUrl) {
+              lastMessageWithSender.imageFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.imageUrl}`;
+            }
+            if (lastMessage.videoUrl) {
+              lastMessageWithSender.videoFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.videoUrl}`;
+            }
+            if (lastMessage.audioUrl) {
+              lastMessageWithSender.audioFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.audioUrl}`;
+            }
+            if (lastMessage.documentUrl) {
+              lastMessageWithSender.documentFullUrl = `${req.protocol}://${req.get('host')}${lastMessage.documentUrl}`;
+            }
+          }
+        }
+      }
+
+      contactObj.chat = {
+        _id: chatData._id,
+        isGroupChat: chatData.isGroupChat,
+        lastActivity: chatData.lastActivity,
+        unreadCount: unreadEntry ? unreadEntry.count : 0,
+        lastMessage: lastMessageWithSender
+      };
+    } else {
+      contactObj.chat = null;
+    }
+
+    return contactObj;
+  } catch (error) {
+    console.error('Error creating contact object:', error);
+    return null;
+  }
+};
+
+// Helper function to populate message with sender details and emit to socket
+const populateAndEmitMessage = async (messageId, chatId, req) => {
+  try {
+    console.log(`[MESSAGE] Starting emission for message ${messageId} in chat ${chatId}`);
+    
+    // Get the message and chat
+    const message = await Message.findById(messageId);
+    const chat = await Chat.findById(chatId).populate('lastMessage');
+    
+    if (!message || !chat) {
+      console.error(`[MESSAGE] Message or chat not found - Message: ${!!message}, Chat: ${!!chat}`);
+      return null;
+    }
+
+    const messageObj = message.toObject();
+
+    // Manually populate sender details
+    if (messageObj.sender) {
+      let sender = await Tenant.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+      
+      if (!sender) {
+        sender = await Owner.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType');
+      }
+      
+      if (sender) {
+        messageObj.sender = {
+          _id: messageObj.sender,
+          fullName: sender.fullName,
+          phonenumber: sender.phonenumber,
+          profilePhoto: sender.profilePhoto,
+          userType: sender.userType
+        };
+        
+        // Add full URL for profile photo
+        if (sender.profilePhoto) {
+          messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+        }
+        
+        console.log(`[MESSAGE] Populated sender details for ${sender.fullName} (${sender.userType})`);
+      } else {
+        console.warn(`[MESSAGE] Sender not found for message ${messageId}`);
+        messageObj.sender = {
+          _id: messageObj.sender,
+          fullName: 'Unknown User',
+          phonenumber: '',
+          profilePhoto: '',
+          userType: 'unknown'
+        };
+      }
+    }
+
+    // Add full URLs for media files
+    if (messageObj.imageUrl) {
+      messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${messageObj.imageUrl}`;
+    }
+    if (messageObj.videoUrl) {
+      messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${messageObj.videoUrl}`;
+    }
+    if (messageObj.audioUrl) {
+      messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${messageObj.audioUrl}`;
+    }
+    if (messageObj.documentUrl) {
+      messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
+    }
+
+    const io = req.app.get("io");
+    
+    // Get room info for debugging
+    const room = io.sockets.adapter.rooms.get(chatId);
+    const roomSize = room ? room.size : 0;
+    console.log(`[SOCKET] Chat room ${chatId} has ${roomSize} connected clients`);
+
+    // Emit new message to chat participants with acknowledgment tracking
+    let deliveryCount = 0;
+    io.to(chatId).emit("newMessage", messageObj, (acks) => {
+      deliveryCount = Array.isArray(acks) ? acks.length : (acks ? 1 : 0);
+      console.log(`[SOCKET] Message ${messageId} delivered to ${deliveryCount} clients in room ${chatId}`);
+      
+      // Emit delivery confirmation back to sender
+      if (messageObj.sender && messageObj.sender._id) {
+        io.to(messageObj.sender._id.toString()).emit("messageDelivered", {
+          messageId: messageId,
+          chatId: chatId,
+          deliveredTo: deliveryCount,
+          timestamp: new Date()
+        });
+      }
+    });
+
+    // Emit contact updates to all participants (existing functionality)
+    console.log(`[CONTACT] Sending contact updates to ${chat.participants.length} participants`);
+    for (const participantId of chat.participants) {
+      try {
+        // Create contact object for each participant
+        const otherParticipants = chat.participants.filter(p => p.toString() !== participantId.toString());
+        
+        for (const otherParticipantId of otherParticipants) {
+          const contactObj = await createContactObject(otherParticipantId, chat, participantId, req);
+          if (contactObj) {
+            // Emit to the participant's personal room
+            io.to(participantId.toString()).emit("contactUpdated", contactObj, (ack) => {
+              console.log(`[CONTACT] Contact update sent to user ${participantId} - Ack: ${!!ack}`);
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`[CONTACT] Error sending contact update to participant ${participantId}:`, error);
+      }
+    }
+
+    console.log(`[MESSAGE] Successfully emitted message ${messageId} to chat ${chatId}`);
+    return messageObj;
+  } catch (error) {
+    console.error(`[MESSAGE] Error populating and emitting message:`, error);
+    return null;
+  }
+};
 
 // Send Text Message
 const sendMessage = async (req, res) => {
@@ -69,6 +251,7 @@ const sendMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "text",
       content
     });
@@ -95,17 +278,23 @@ const sendMessage = async (req, res) => {
       }
     });
 
+    // Save chat first
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Text message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -119,10 +308,12 @@ const sendMessage = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    
+    console.log(`[API] Getting messages for chat ${chatId} by user ${req.user._id}`);
 
     const chat = await Chat.findById(chatId);
     if (!chat) {
+      console.warn(`[API] Chat ${chatId} not found`);
       return res.status(404).json({
         success: false,
         message: "Chat not found"
@@ -130,38 +321,107 @@ const getMessages = async (req, res) => {
     }
 
     if (!chat.participants.includes(req.user._id)) {
+      console.warn(`[API] User ${req.user._id} unauthorized for chat ${chatId}`);
       return res.status(403).json({
         success: false,
         message: "Unauthorized"
       });
     }
 
+    // Get all messages with proper sorting (oldest first for chronological order)
     const messages = await Message.find({
       chat: chatId,
       isDeleted: false
     })
-      .populate("sender", "fullName profilePhoto")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .sort({ createdAt: 1 }) // ASC order as requested
+      .lean(); // Use lean for better performance
 
-    const total = await Message.countDocuments({
-      chat: chatId,
-      isDeleted: false
-    });
+    console.log(`[API] Found ${messages.length} messages in chat ${chatId}`);
+
+    // Manually populate sender details from both Tenant and Owner collections
+    const messagesWithFullDetails = await Promise.all(
+      messages.map(async (messageObj) => {
+        // Populate sender details
+        if (messageObj.sender) {
+          // Try to find in Tenant collection first
+          let sender = await Tenant.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType').lean();
+          
+          // If not found in Tenant, try Owner collection
+          if (!sender) {
+            sender = await Owner.findById(messageObj.sender).select('fullName phonenumber profilePhoto userType').lean();
+          }
+          
+          if (sender) {
+            messageObj.sender = {
+              _id: messageObj.sender,
+              fullName: sender.fullName,
+              phonenumber: sender.phonenumber,
+              profilePhoto: sender.profilePhoto,
+              userType: sender.userType
+            };
+            
+            // Add full URL for profile photo
+            if (sender.profilePhoto) {
+              messageObj.sender.profilePhotoUrl = `${req.protocol}://${req.get('host')}${sender.profilePhoto}`;
+            }
+          } else {
+            console.warn(`[API] Sender ${messageObj.sender} not found for message ${messageObj._id}`);
+            messageObj.sender = {
+              _id: messageObj.sender,
+              fullName: 'Unknown User',
+              phonenumber: '',
+              profilePhoto: '',
+              userType: 'unknown'
+            };
+          }
+        }
+        
+        // Add full URLs for media files
+        if (messageObj.imageUrl) {
+          messageObj.imageFullUrl = `${req.protocol}://${req.get('host')}${messageObj.imageUrl}`;
+        }
+        if (messageObj.videoUrl) {
+          messageObj.videoFullUrl = `${req.protocol}://${req.get('host')}${messageObj.videoUrl}`;
+        }
+        if (messageObj.audioUrl) {
+          messageObj.audioFullUrl = `${req.protocol}://${req.get('host')}${messageObj.audioUrl}`;
+        }
+        if (messageObj.documentUrl) {
+          messageObj.documentFullUrl = `${req.protocol}://${req.get('host')}${messageObj.documentUrl}`;
+        }
+
+        // Ensure all required fields are present
+        messageObj.isEdited = messageObj.isEdited || false;
+        messageObj.isDeleted = messageObj.isDeleted || false;
+        messageObj.readBy = messageObj.readBy || [];
+        
+        // Add read status for current user
+        const currentUserRead = messageObj.readBy.find(read => 
+          read.user && read.user.toString() === req.user._id.toString()
+        );
+        messageObj.isReadByCurrentUser = !!currentUserRead;
+        if (currentUserRead) {
+          messageObj.readByCurrentUserAt = currentUserRead.readAt;
+        }
+        
+        return messageObj;
+      })
+    );
+
+    console.log(`[API] Successfully processed and returning ${messagesWithFullDetails.length} messages`);
 
     res.json({
       success: true,
       data: {
-        messages: messages.reverse(),
-        pagination: {
-          current: parseInt(page),
-          total: Math.ceil(total / limit),
-          hasNext: page * limit < total
-        }
+        chatId: chatId,
+        messages: messagesWithFullDetails,
+        totalMessages: messages.length,
+        participants: chat.participants,
+        lastActivity: chat.lastActivity
       }
     });
   } catch (error) {
+    console.error(`[API] Error getting messages for chat ${req.params.chatId}:`, error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -196,21 +456,20 @@ const sendPhotoMessage = async (req, res) => {
       });
     }
 
-    // const result = await uploadToCloudinary(
-    //   req.file.buffer,
-    //   "chat_images",
-    //   "image"
-    // );
-
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_images/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload image
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_images",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "image",
-      imageUrl: result.secure_url,
-      fileName: req.file.originalname,
+      imageUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -239,15 +498,20 @@ const sendPhotoMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Photo message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -287,6 +551,7 @@ const sendLocationMessage = async (req, res) => {
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "location",
       location: {
         latitude: lat,
@@ -319,15 +584,20 @@ const sendLocationMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Location message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -364,15 +634,20 @@ const sendVideoMessage = async (req, res) => {
       });
     }
 
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_videos/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload video
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_videos",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "video",
-      videoUrl: result.secure_url,
-      fileName: req.file.originalname,
+      videoUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -401,15 +676,20 @@ const sendVideoMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Video message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -446,15 +726,20 @@ const sendDocumentMessage = async (req, res) => {
       });
     }
 
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_documents/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload document
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_documents",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "document",
-      documentUrl: result.secure_url,
-      fileName: req.file.originalname,
+      documentUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -483,15 +768,20 @@ const sendDocumentMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Document message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -528,15 +818,20 @@ const sendAudioMessage = async (req, res) => {
       });
     }
 
-    // For demonstration, assume result.secure_url exists
-    const result = { secure_url: `/uploads/chat_audio/${Date.now()}-${req.file.originalname}` };
+    // Use saveFile utility to upload audio
+    const result = await saveFile(
+      req.file.buffer,
+      "chat_audio",
+      req.file.originalname
+    );
 
     const message = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "audio",
-      audioUrl: result.secure_url,
-      fileName: req.file.originalname,
+      audioUrl: result.url,
+      fileName: result.filename,
       fileSize: req.file.size,
       fileMimeType: req.file.mimetype
     });
@@ -565,15 +860,20 @@ const sendAudioMessage = async (req, res) => {
 
     await chat.save();
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(message._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message sent but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      message: "Audio message sent successfully",
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -679,6 +979,7 @@ const forwardMessage = async (req, res) => {
     const newMessage = await Message.create({
       chat: chatId,
       sender: req.user._id,
+      senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: sourceMessage.messageType,
       content: sourceMessage.content,
       imageUrl: sourceMessage.imageUrl,
@@ -716,15 +1017,19 @@ const forwardMessage = async (req, res) => {
 
     await targetChat.save();
 
-    const populatedMessage = await Message.findById(newMessage._id)
-      .populate("sender", "fullName profilePhoto");
+    // Populate message with full details and emit to socket
+    const messageObj = await populateAndEmitMessage(newMessage._id, chatId, req);
 
-    // Emit socket event
-    req.app.get("io").to(chatId).emit("newMessage", populatedMessage);
+    if (!messageObj) {
+      return res.status(500).json({
+        success: false,
+        message: "Message forwarded but failed to broadcast to other users"
+      });
+    }
 
     res.status(201).json({
       success: true,
-      data: populatedMessage
+      data: messageObj
     });
   } catch (error) {
     res.status(500).json({
@@ -829,6 +1134,268 @@ const deleteMediaFile = async (req, res) => {
   }
 };
 
+// Get read status for specific messages
+const getMessageReadStatus = async (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'messageIds array is required'
+      });
+    }
+
+    // Get messages with their read status
+    const messages = await Message.find({
+      _id: { $in: messageIds }
+    })
+    .select('_id readBy chat sender createdAt')
+    .populate({
+      path: 'readBy.user',
+      select: 'fullName profilePhoto userType'
+    })
+    .populate({
+      path: 'sender',
+      select: 'fullName profilePhoto userType'
+    });
+
+    // Verify user has access to these messages by checking chat participation
+    const chatIds = [...new Set(messages.map(msg => msg.chat.toString()))];
+    const userChats = await Chat.find({
+      _id: { $in: chatIds },
+      participants: currentUserId
+    }).select('_id participants');
+
+    const authorizedChatIds = userChats.map(chat => chat._id.toString());
+    const chatParticipantMap = {};
+    
+    userChats.forEach(chat => {
+      chatParticipantMap[chat._id.toString()] = chat.participants.length;
+    });
+    
+    // Filter messages to only include those from chats user has access to
+    const authorizedMessages = messages.filter(msg => 
+      authorizedChatIds.includes(msg.chat.toString())
+    );
+
+    const readStatusData = authorizedMessages.map(message => {
+      const totalParticipants = chatParticipantMap[message.chat.toString()] || 0;
+      return {
+        messageId: message._id,
+        chatId: message.chat,
+        sender: {
+          _id: message.sender._id,
+          fullName: message.sender.fullName,
+          profilePhoto: message.sender.profilePhoto,
+          userType: message.sender.userType
+        },
+        createdAt: message.createdAt,
+        readBy: message.readBy.map(read => ({
+          userId: read.user._id,
+          fullName: read.user.fullName,
+          profilePhoto: read.user.profilePhoto,
+          userType: read.user.userType,
+          readAt: read.readAt
+        })),
+        readCount: message.readBy.length,
+        unreadCount: totalParticipants - message.readBy.length,
+        totalParticipants: totalParticipants,
+        isFullyRead: message.readBy.length === totalParticipants,
+        isReadByCurrentUser: message.readBy.some(read => 
+          read.user && read.user._id && read.user._id.toString() === currentUserId.toString()
+        )
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Read status retrieved successfully',
+      data: readStatusData
+    });
+
+  } catch (error) {
+    console.error('Error getting message read status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get read status',
+      error: error.message
+    });
+  }
+};
+
+// Mark message as read
+const markMessageAsRead = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const currentUserId = req.user.id;
+
+    if (!messageId) {
+      return res.status(400).json({
+        success: false,
+        message: 'messageId is required'
+      });
+    }
+
+    // Find the message and verify access
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    // Verify user is participant in the chat
+    const chat = await Chat.findById(message.chat);
+    if (!chat || !chat.participants.some(p => p.equals(currentUserId))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to mark this message as read'
+      });
+    }
+
+    // Check if user has already read this message
+    const alreadyRead = message.readBy.some(read => 
+      read.user && read.user.equals && read.user.equals(currentUserId)
+    );
+
+    if (!alreadyRead) {
+      // Mark as read
+      message.readBy.push({
+        user: currentUserId,
+        readAt: new Date()
+      });
+      await message.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Message marked as read successfully',
+      data: {
+        messageId: messageId,
+        alreadyRead: alreadyRead,
+        readAt: new Date(),
+        readCount: message.readBy.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error marking message as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark message as read',
+      error: error.message
+    });
+  }
+};
+
+// Mark multiple messages as read
+const markMessagesAsRead = async (req, res) => {
+  try {
+    const { messageIds, chatId } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'messageIds array is required'
+      });
+    }
+
+    // Verify user is participant in the chat if chatId is provided
+    if (chatId) {
+      const chat = await Chat.findById(chatId);
+      if (!chat || !chat.participants.some(p => p.equals(currentUserId))) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to mark messages in this chat as read'
+        });
+      }
+    }
+
+    // Update multiple messages at once
+    const updateQuery = {
+      _id: { $in: messageIds },
+      "readBy.user": { $ne: currentUserId }
+    };
+
+    if (chatId) {
+      updateQuery.chat = chatId;
+    }
+
+    const result = await Message.updateMany(
+      updateQuery,
+      {
+        $push: {
+          readBy: {
+            user: currentUserId,
+            readAt: new Date()
+          }
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `${result.modifiedCount} messages marked as read`,
+      data: {
+        messageIds: messageIds,
+        chatId: chatId,
+        modifiedCount: result.modifiedCount,
+        readAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark messages as read',
+      error: error.message
+    });
+  }
+};
+
+// Get unread messages count for user
+const getUnreadMessagesCount = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+
+    // Get all chats for the user
+    const userChats = await Chat.find({
+      participants: currentUserId
+    }).select('_id');
+
+    const chatIds = userChats.map(chat => chat._id);
+
+    // Count unread messages across all chats
+    const unreadCount = await Message.countDocuments({
+      chat: { $in: chatIds },
+      "readBy.user": { $ne: currentUserId },
+      isDeleted: false
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Unread messages count retrieved successfully',
+      data: {
+        unreadCount: unreadCount,
+        totalChats: chatIds.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting unread messages count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread messages count',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   sendMessage,
   getMessages,
@@ -840,5 +1407,10 @@ module.exports = {
   editMessage,
   forwardMessage,
   deleteMessage,
-  deleteMediaFile
+  deleteMediaFile,
+  createContactObject,
+  getMessageReadStatus,
+  markMessageAsRead,
+  markMessagesAsRead,
+  getUnreadMessagesCount
 };

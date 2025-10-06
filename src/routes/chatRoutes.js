@@ -11,7 +11,9 @@ const {
   muteChat,
   unmuteChat,
   archiveChat,
-  unarchiveChat
+  unarchiveChat,
+  getContacts,
+  getTotalUnreadCount
 } = require('../controllers/chatController');
 const { auth } = require('../middleware/auth');
 
@@ -22,10 +24,12 @@ router.use(auth);
 
 // Existing routes
 router.get('/', getAllChats);
+router.get('/contacts', getContacts);
+router.get('/unread', getChatsWithUnread);
+router.get('/total-unread', getTotalUnreadCount);
 router.post('/access', accessChat);
 router.post('/group', createGroupChat); 
 router.get('/search', searchChats);
-router.get('/unread', getChatsWithUnread);
 router.put('/:chatId/read', markChatAsRead);
 router.delete('/:chatId', deleteChat);
 

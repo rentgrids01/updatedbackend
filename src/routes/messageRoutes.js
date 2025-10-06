@@ -10,7 +10,11 @@ const {
   editMessage,
   forwardMessage,
   deleteMessage,
-  deleteMediaFile
+  deleteMediaFile,
+  getMessageReadStatus,
+  markMessageAsRead,
+  markMessagesAsRead,
+  getUnreadMessagesCount
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -34,5 +38,11 @@ router.post('/audio', upload.single('audio'), sendAudioMessage);
 router.put('/:messageId/edit', editMessage);
 router.put('/:messageId/forward/:chatId', forwardMessage);
 router.delete('/:messageId/file', deleteMediaFile);
+
+// Read status routes
+router.post('/read-status', getMessageReadStatus);
+router.put('/:messageId/read', markMessageAsRead);
+router.put('/bulk-read', markMessagesAsRead);
+router.get('/unread/count', getUnreadMessagesCount);
 
 module.exports = router;
