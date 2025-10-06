@@ -20,4 +20,36 @@ const calculateProfileScore = (tenant) => {
   return score;
 };
 
-module.exports = { calculateProfileScore };
+const calculateProfileScoreOwner = (owner) => {
+  const fields = [
+    "fullName",
+    "emailId",
+    "phonenumber",
+    "dob",
+    "gender",
+    "profilePhoto",
+    "companyName",
+    "gstNumber",
+    "panCard",
+    "aadhaarCard",
+    "address",
+  ];
+
+  let filled = 0;
+
+  fields.forEach((field) => {
+    if (owner[field] !== undefined && owner[field] !== null && owner[field] !== "") {
+      filled++;
+    }
+  });
+
+  if (Array.isArray(owner.documents) && owner.documents.length > 0) {
+    filled++;
+  }
+
+  const total = fields.length + 1; // +1 for documents
+  const score = Math.round((filled / total) * 100);
+  return score;
+};
+
+module.exports = { calculateProfileScore, calculateProfileScoreOwner };
