@@ -15,14 +15,22 @@ const {
   sendOTPEmail,
   verifyOTP,
 } = require("../utils/emailService");
+const {
+  calculateProfileScoreOwner,
+} = require("../utils/calculateProfileScore");
 // Get Dashboard
 
 const getDashboard = async (req, res) => {
   try {
     const ownerId = req.user._id;
 
+    // Fetch owner data to calculate profile score
+    const owner = await Owner.findById(ownerId).lean();
+    const profileScore = owner ? calculateProfileScoreOwner(owner) : 0;
+
     const properties = await Property.find({ owner: ownerId }).lean();
-    if (!properties.length) return res.json({ success: true, data: [] });
+    if (!properties.length)
+      return res.json({ success: true, profileScore, data: [] });
 
     const propertyIds = properties.map((p) => p._id);
     const criteriaList = await PropertyTenantCriteria.find({
@@ -84,7 +92,11 @@ const getDashboard = async (req, res) => {
       };
     });
 
-    return res.json({ success: true, data: dashboard });
+    return res.json({
+      success: true,
+      profileScore,
+      data: dashboard,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -95,10 +107,6 @@ const getDashboard = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const owner = await Owner.findById(req.user._id).select("-password");
-
-    // const profile = await LandlordProfile.findOne({
-    //   userId: req.user._id,
-    // }).populate("userId", "fullName emailId phonenumber profilePhoto");
 
     if (!owner) {
       return res.status(404).json({
@@ -147,7 +155,6 @@ const createProfile = async (req, res) => {
   try {
     const {
       fullName,
-      email,
       phone,
       dob,
       gender,
@@ -162,7 +169,6 @@ const createProfile = async (req, res) => {
       req.user._id,
       {
         fullName: fullName || req.user.fullName,
-        emailId: email || req.user.emailId,
         phonenumber: phone || req.user.phonenumber,
         dob,
         gender,
