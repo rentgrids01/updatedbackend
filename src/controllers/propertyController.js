@@ -140,9 +140,24 @@ const getAllProperties = async (req, res) => {
       showVerified = false,
       sortBy = "createdAt",
       order = "desc",
+      status,
     } = req.query;
 
-    const query = { status: "published", isActive: true };
+    const query = { isActive: true };
+
+    // Status filter - allow different status values
+    if (status) {
+      if (Array.isArray(status)) {
+        // If multiple statuses are provided
+        query.status = { $in: status };
+      } else {
+        // Single status filter
+        query.status = status;
+      }
+    } else {
+      // Default behavior - show published properties
+      query.status = "published";
+    }
 
     // Location filters
     if (location) {
@@ -348,6 +363,7 @@ const getAllProperties = async (req, res) => {
             bathrooms,
             floors,
             showVerified,
+            status,
             sortBy,
             order,
           },
@@ -430,7 +446,7 @@ const getPropertyById = async (req, res) => {
 const getSimilarProperties = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const { limit = 3 } = req.query;
+    const { limit = 3, status = "published" } = req.query;
 
     const property = await Property.findById(propertyId);
     if (!property) {
@@ -438,6 +454,12 @@ const getSimilarProperties = async (req, res) => {
         success: false,
         message: "Property not found",
       });
+    }
+
+    // Build status query
+    const statusQuery = {};
+    if (status && status !== "all") {
+      statusQuery.status = status;
     }
 
     // Enhanced similarity logic
@@ -472,7 +494,7 @@ const getSimilarProperties = async (req, res) => {
           },
         },
       ],
-      status: "published",
+      ...statusQuery,
       isActive: true,
     })
       .populate({
