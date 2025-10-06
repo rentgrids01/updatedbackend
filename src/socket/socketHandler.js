@@ -330,20 +330,20 @@ const socketHandler = (io) => {
         // Update chat lastMessage + lastActivity and increment unread count for other participants
         chat.lastMessage = newMessage._id;
         chat.updateLastActivity();
-        
+
         // Increment unread count for all participants except the sender
         chat.participants.forEach((participantId) => {
           if (participantId.toString() !== socket.userId) {
             chat.incrementUnreadCount(participantId);
           }
         });
-        
+
         await chat.save();
 
         // Broadcast message to chat room with enhanced read status info
         const messageWithReadInfo = {
           ...newMessage.toObject(),
-          readBy: newMessage.readBy.map(read => ({
+          readBy: newMessage.readBy.map((read) => ({
             user: read.user,
             readAt: read.readAt,
           })),
@@ -357,18 +357,18 @@ const socketHandler = (io) => {
         // Auto-mark as read for participants who are currently viewing this chat
         const roomSockets = await io.in(chatId).fetchSockets();
         const autoReadPromises = [];
-        
+
         for (const roomSocket of roomSockets) {
           // Skip the sender
           if (roomSocket.userId === socket.userId) continue;
-          
+
           // Check if this user is currently viewing this chat
           if (roomSocket.currentlyViewingChat === chatId) {
             autoReadPromises.push(
               Message.updateOne(
                 {
                   _id: newMessage._id,
-                  "readBy.user": { $ne: roomSocket.user._id }
+                  "readBy.user": { $ne: roomSocket.user._id },
                 },
                 {
                   $push: {
@@ -391,7 +391,7 @@ const socketHandler = (io) => {
                   autoRead: true,
                   timestamp: new Date(),
                 });
-                
+
                 console.log(
                   `[SOCKET] Auto-marked message as read for viewing user ${roomSocket.user.fullName}`
                 );
@@ -399,7 +399,7 @@ const socketHandler = (io) => {
             );
           }
         }
-        
+
         // Wait for all auto-read operations to complete
         if (autoReadPromises.length > 0) {
           await Promise.all(autoReadPromises);
@@ -460,7 +460,10 @@ const socketHandler = (io) => {
 
         // Verify user is participant in this chat
         const chat = await Chat.findById(chatId);
-        if (!chat || !chat.participants.some((p) => p.equals(socket.user._id))) {
+        if (
+          !chat ||
+          !chat.participants.some((p) => p.equals(socket.user._id))
+        ) {
           return callback?.({
             success: false,
             message: "Unauthorized to mark message as read",
@@ -477,8 +480,9 @@ const socketHandler = (io) => {
         }
 
         // Check if user has already read this message
-        const alreadyRead = message.readBy.some((read) => 
-          read.user && read.user.equals && read.user.equals(socket.user._id)
+        const alreadyRead = message.readBy.some(
+          (read) =>
+            read.user && read.user.equals && read.user.equals(socket.user._id)
         );
 
         if (!alreadyRead) {
@@ -539,7 +543,10 @@ const socketHandler = (io) => {
 
         // Verify user is participant in this chat
         const chat = await Chat.findById(chatId);
-        if (!chat || !chat.participants.some((p) => p.equals(socket.user._id))) {
+        if (
+          !chat ||
+          !chat.participants.some((p) => p.equals(socket.user._id))
+        ) {
           return callback?.({
             success: false,
             message: "Unauthorized to mark messages as read",
@@ -592,7 +599,10 @@ const socketHandler = (io) => {
           },
         });
       } catch (error) {
-        console.error(`[SOCKET] Error marking messages as read in bulk:`, error);
+        console.error(
+          `[SOCKET] Error marking messages as read in bulk:`,
+          error
+        );
         callback?.({
           success: false,
           message: "Failed to mark messages as read",
@@ -615,32 +625,34 @@ const socketHandler = (io) => {
 
         // Get messages with their read status
         const messages = await Message.find({
-          _id: { $in: messageIds }
+          _id: { $in: messageIds },
         })
-        .select("_id readBy chat")
-        .populate({
-          path: "readBy.user",
-          select: "fullName profilePhoto userType",
-        });
+          .select("_id readBy chat")
+          .populate({
+            path: "readBy.user",
+            select: "fullName profilePhoto userType",
+          });
 
         // Verify user has access to these messages by checking chat participation
-        const chatIds = [...new Set(messages.map(msg => msg.chat.toString()))];
+        const chatIds = [
+          ...new Set(messages.map((msg) => msg.chat.toString())),
+        ];
         const userChats = await Chat.find({
           _id: { $in: chatIds },
-          participants: socket.user._id
+          participants: socket.user._id,
         }).select("_id");
 
-        const authorizedChatIds = userChats.map(chat => chat._id.toString());
-        
+        const authorizedChatIds = userChats.map((chat) => chat._id.toString());
+
         // Filter messages to only include those from chats user has access to
-        const authorizedMessages = messages.filter(msg => 
+        const authorizedMessages = messages.filter((msg) =>
           authorizedChatIds.includes(msg.chat.toString())
         );
 
-        const readStatusData = authorizedMessages.map(message => ({
+        const readStatusData = authorizedMessages.map((message) => ({
           messageId: message._id,
           chatId: message.chat,
-          readBy: message.readBy.map(read => ({
+          readBy: message.readBy.map((read) => ({
             userId: read.user._id,
             fullName: read.user.fullName,
             profilePhoto: read.user.profilePhoto,
@@ -679,7 +691,10 @@ const socketHandler = (io) => {
 
         // Verify user is participant
         const chat = await Chat.findById(chatId);
-        if (!chat || !chat.participants.some((p) => p.equals(socket.user._id))) {
+        if (
+          !chat ||
+          !chat.participants.some((p) => p.equals(socket.user._id))
+        ) {
           return callback?.({
             success: false,
             message: "Unauthorized to view this chat",
@@ -706,18 +721,18 @@ const socketHandler = (io) => {
           // Find unread messages in this chat for this user
           const unreadMessages = await Message.find({
             chat: chatId,
-            "readBy.user": { $ne: socket.user._id }
+            "readBy.user": { $ne: socket.user._id },
           }).select("_id");
 
           if (unreadMessages.length > 0) {
-            const messageIds = unreadMessages.map(msg => msg._id);
-            
+            const messageIds = unreadMessages.map((msg) => msg._id);
+
             // Mark them as read
             await Message.updateMany(
               {
                 _id: { $in: messageIds },
                 chat: chatId,
-                "readBy.user": { $ne: socket.user._id }
+                "readBy.user": { $ne: socket.user._id },
               },
               {
                 $push: {
@@ -781,10 +796,10 @@ const socketHandler = (io) => {
     // Handle user stopping viewing a chat
     socket.on("stop-viewing-chat", (data, callback) => {
       const { chatId } = data;
-      
+
       if (socket.currentlyViewingChat === chatId) {
         socket.currentlyViewingChat = null;
-        
+
         console.log(
           `[SOCKET] User ${socket.user.fullName} stopped viewing chat ${chatId}`
         );
@@ -819,7 +834,10 @@ const socketHandler = (io) => {
 
         // Find the chat and verify user is participant
         const chat = await Chat.findById(chatId);
-        if (!chat || !chat.participants.some((p) => p.equals(socket.user._id))) {
+        if (
+          !chat ||
+          !chat.participants.some((p) => p.equals(socket.user._id))
+        ) {
           return callback?.({
             success: false,
             message: "Unauthorized to mark this chat as read",
@@ -966,6 +984,29 @@ const socketHandler = (io) => {
           console.log(`[SOCKET] Broadcasted offline status to room: ${room}`);
         }
       });
+    });
+
+    socket.on("delete-message", async ({ chatId, messageId }, callback) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message)
+          return callback({ success: false, message: "Message not found" });
+
+        // Ensure only sender can delete
+        if (message.sender.toString() !== socket.userId.toString()) {
+          return callback({ success: false, message: "Unauthorized" });
+        }
+
+        await Message.deleteOne({ _id: messageId });
+
+        // Notify all users in the chat
+        io.to(chatId).emit("message-deleted", { messageId });
+
+        callback({ success: true });
+      } catch (error) {
+        console.error("Delete message error:", error);
+        callback({ success: false, message: "Server error" });
+      }
     });
 
     // Auto-trigger chat joining when user connects
