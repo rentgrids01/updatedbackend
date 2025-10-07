@@ -33,11 +33,11 @@ const propertySchema = new mongoose.Schema({
   },
   monthlyRent: {
     type: Number,
-    required:true,
+    required: true,
   },
-  securityDeposit:{
+  securityDeposit: {
     type: Number,
-    required:true,
+    required: true,
   },
   areaUnit: {
     type: Number,
@@ -80,7 +80,7 @@ const propertySchema = new mongoose.Schema({
   },
   nearbyPlaces: {
     type: [String],
-    default: false
+    default: false,
   },
   location: {
     city: {
@@ -121,8 +121,9 @@ const propertySchema = new mongoose.Schema({
   images: [String],
   status: {
     type: String,
-    enum: ["request", "draft", "published", "rented", "sold", "inactive"],
-    default: "request",
+    // enum: ["request", "draft", "published", "rented", "sold", "inactive"],
+    enum: ["pending", "draft", "active", "reject", "deleted", "inactive"],
+    default: "pending",
   },
   views: {
     type: Number,

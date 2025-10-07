@@ -5,6 +5,7 @@ const Amenity = require("../models/Amenity");
 const mongoose = require("mongoose");
 const { saveFile, deleteFile } = require("../utils/fileUpload");
 const { generatePropertyId } = require("../utils/propertyIdGenerator");
+const VisitRequest = require("../models/VisitRequest");
 
 const getFullImageUrl = (imagePath, req) => {
   if (!imagePath) return null;
@@ -568,10 +569,34 @@ const getOwnerProperties = async (req, res) => {
 
     const total = await Property.countDocuments(query);
 
-    // Process properties to include full URLs
-    const processedProperties = properties.map((property) =>
-      processPropertyData(property, req)
-    );
+    const propertyIds = properties.map((p) => p._id);
+
+    const visitRequestsCount = await VisitRequest.aggregate([
+      {
+        $match: {
+          property: {
+            $in: propertyIds.map((id) => new mongoose.Types.ObjectId(id)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$property",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const visitCountMap = {};
+    visitRequestsCount.forEach((item) => {
+      visitCountMap[item._id.toString()] = item.count;
+    });
+
+    const processedProperties = properties.map((property) => {
+      const propObj = processPropertyData(property, req);
+      propObj.applicationCount = visitCountMap[property._id.toString()] || 0;
+      return propObj;
+    });
 
     res.json({
       success: true,
