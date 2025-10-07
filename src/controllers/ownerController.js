@@ -79,6 +79,7 @@ const getDashboard = async (req, res) => {
           tenant: request.tenant,
           visitRequest: request,
           matchScore: calculateMatchScore(propertyCriteria, tenantApp),
+          budget : tenantApp?.propertyPreferences?.budget || null
         };
       });
 
