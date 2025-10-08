@@ -79,7 +79,7 @@ const getDashboard = async (req, res) => {
           tenant: request.tenant,
           visitRequest: request,
           matchScore: calculateMatchScore(propertyCriteria, tenantApp),
-          budget : tenantApp?.propertyPreferences?.budget || null
+          budget: tenantApp?.propertyPreferences?.budget || null,
         };
       });
 
@@ -524,8 +524,25 @@ const updateVisitRequest = async (req, res) => {
         break;
 
       case "accept_and_schedule":
-        // Simply approve the visit request without requiring date/time from landlord
-        // The tenant has already provided the schedule details when creating the request
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const dailyAcceptedCount = await VisitRequest.countDocuments({
+          landlord: req.user._id,
+          status: { $in: ["landlord_approved"] },
+          updatedAt: { $gte: startOfDay, $lte: endOfDay },
+        });
+
+        if (dailyAcceptedCount >= 5) {
+          return res.status(400).json({
+            success: false,
+            message: "You’ve reached your daily limit of 5 scheduled visits.",
+          });
+        }
+
         updateData.status = "landlord_approved";
         updateData.notes = note || visitRequest.notes;
         updateData.progress = 100;
@@ -536,7 +553,7 @@ const updateVisitRequest = async (req, res) => {
           landlord: visitRequest.landlord,
           property: visitRequest.property,
           date: visitRequest.scheduledDate,
-          time: visitRequest.slots[0]?.scheduledTime, // Use first slot or you could modify this logic
+          time: visitRequest.slots[0]?.scheduledTime,
           notes: note || visitRequest.notes,
           status: "confirmed",
         });
