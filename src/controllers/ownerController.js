@@ -806,6 +806,18 @@ const RescheduleVisit = async (req, res) => {
       });
     }
 
+    // Add a rescheduleCount property if not present
+    if (typeof visit.rescheduleCount !== "number") {
+      visit.rescheduleCount = 0;
+    }
+
+    if (visit.rescheduleCount >= 5) {
+      return res.status(400).json({
+        success: false,
+        message: "You have reached the maximum number of 5 reschedules for this visit.",
+      });
+    }
+
     const startOfDay = new Date(scheduledDate);
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -837,6 +849,7 @@ const RescheduleVisit = async (req, res) => {
     visit.slots = newSlots;
     visit.status = "scheduled";
     visit.updatedAt = new Date();
+    visit.rescheduleCount = (visit.rescheduleCount || 0) + 1;
 
     await visit.save();
 
