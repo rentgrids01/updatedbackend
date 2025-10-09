@@ -146,18 +146,14 @@ const getAllProperties = async (req, res) => {
 
     const query = { isActive: true };
 
-    // Status filter - allow different status values
     if (status) {
       if (Array.isArray(status)) {
-        // If multiple statuses are provided
         query.status = { $in: status };
       } else {
-        // Single status filter
         query.status = status;
       }
     } else {
-      // Default behavior - show published properties
-      query.status = "published";
+      query.status = "active";
     }
 
     // Location filters
