@@ -359,9 +359,15 @@ const getDashboardSummary = async (req, res) => {
 const getSavedProperties = async (req, res) => {
   try {
     const savedProperties = await SavedProperty.find({ tenant: req.user._id })
-      .populate("property")
+      .populate({
+        path: "property",
+        populate: {
+          path: "owner",
+          select: "-password"
+        }
+      })
       .sort({ savedAt: -1 });
-
+      
     res.json({
       success: true,
       data: savedProperties,
