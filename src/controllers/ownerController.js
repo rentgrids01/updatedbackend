@@ -19,6 +19,8 @@ const {
   calculateProfileScoreOwner,
 } = require("../utils/calculateProfileScore");
 const Invite = require("../models/Invite");
+const notificationService = require("../services/notificationService");
+
 // Get Dashboard
 
 const getDashboard = async (req, res) => {
@@ -593,6 +595,47 @@ const updateVisitRequest = async (req, res) => {
       message: `Visit request ${action.replace("_", " ")} successfully`,
       data: updatedRequest,
     });
+    // Notify tenant depending on action (non-blocking)
+    (async () => {
+      try {
+        if (action === "reject") {
+          await notificationService.createNotification({
+            recipient: updatedRequest.tenant._id || updatedRequest.tenant,
+            recipientModel: "Tenant",
+            type: "visit_rejected_by_owner",
+            title: "Visit request rejected",
+            message: `Your visit request for ${
+              updatedRequest.property?.title || ""
+            } was rejected by the owner`,
+            data: {
+              visitRequestId: updatedRequest._id?.toString(),
+              propertyId: updatedRequest.property?._id?.toString(),
+            },
+            relatedId: updatedRequest._id,
+          });
+        } else if (action === "accept_and_schedule" || action === "accept") {
+          await notificationService.createNotification({
+            recipient: updatedRequest.tenant._id || updatedRequest.tenant,
+            recipientModel: "Tenant",
+            type: "visit_approved_by_owner",
+            title: "Visit approved",
+            message: `Your visit request for ${
+              updatedRequest.property?.title || ""
+            } was approved by the owner`,
+            data: {
+              visitRequestId: updatedRequest._id?.toString(),
+              propertyId: updatedRequest.property?._id?.toString(),
+            },
+            relatedId: updatedRequest._id,
+          });
+        }
+      } catch (err) {
+        console.error(
+          "Failed to notify tenant about visit request update:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
   } catch (error) {
     console.error("Error updating visit request:", error);
     res.status(500).json({
@@ -739,7 +782,7 @@ const inviteToTenant = async (req, res) => {
     });
 
     await newInvite.save();
-    
+
     res.status(201).json({
       success: true,
       message: "Invite sent to Tenant successfully",
@@ -755,67 +798,69 @@ const inviteToTenant = async (req, res) => {
 };
 
 const actionOnInviteFromTenant = async (req, res) => {
-   try {
-      const { inviteId } = req.params;
-      const { action } = req.body;
-      const ownerId = req.user._id;
-  
-      // Find the offer
-      const invite = await Invite.findById(inviteId).select("-tenantInviteStatus");;
-  
-      if (!invite) {
-        return res.status(404).json({
-          success: false,
-          message: "Invite not found",
-        });
-      }
-  
-      if (!invite.owner || invite.owner.toString() !== ownerId.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "Unauthorized to act on this invitation",
-        });
-      }
-  
-      if (
-        (action === "accept" && invite.ownerInviteStatus === "rejected") ||
-        (action === "reject" && invite.ownerInviteStatus === "accepted")
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot ${action} an offer that is already ${invite.ownerInviteStatus}`,
-        });
-      }
-  
-      // Handle the action
-      if (action === "accept") {
-        invite.ownerInviteStatus = "accepted";
-      } else if (action === "reject") {
-        invite.ownerInviteStatus = "rejected";
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid action. Use 'accept' or 'reject'.",
-        });
-      }
-  
-      invite.updatedAt = new Date();
-      await invite.save();
-  
-      res.json({
-        success: true,
-        message: `Invite successfully ${action}ed`,
-        data: invite,
-      });
-    } catch (error) {
-      console.error("Error handling offer action:", error);
-      res.status(500).json({
+  try {
+    const { inviteId } = req.params;
+    const { action } = req.body;
+    const ownerId = req.user._id;
+
+    // Find the offer
+    const invite = await Invite.findById(inviteId).select(
+      "-tenantInviteStatus"
+    );
+
+    if (!invite) {
+      return res.status(404).json({
         success: false,
-        message: "Failed to handle offer action",
-        error: error.message,
+        message: "Invite not found",
       });
     }
-}
+
+    if (!invite.owner || invite.owner.toString() !== ownerId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to act on this invitation",
+      });
+    }
+
+    if (
+      (action === "accept" && invite.ownerInviteStatus === "rejected") ||
+      (action === "reject" && invite.ownerInviteStatus === "accepted")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot ${action} an offer that is already ${invite.ownerInviteStatus}`,
+      });
+    }
+
+    // Handle the action
+    if (action === "accept") {
+      invite.ownerInviteStatus = "accepted";
+    } else if (action === "reject") {
+      invite.ownerInviteStatus = "rejected";
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Use 'accept' or 'reject'.",
+      });
+    }
+
+    invite.updatedAt = new Date();
+    await invite.save();
+
+    res.json({
+      success: true,
+      message: `Invite successfully ${action}ed`,
+      data: invite,
+    });
+  } catch (error) {
+    console.error("Error handling offer action:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to handle offer action",
+      error: error.message,
+    });
+  }
+};
 
 // Accept Reschedule Request
 const acceptRescheduleRequest = async (req, res) => {
@@ -854,6 +899,29 @@ const acceptRescheduleRequest = async (req, res) => {
       message: "Reschedule accepted successfully",
       data: visit,
     });
+    // Notify tenant that owner accepted the reschedule
+    (async () => {
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.createNotification({
+          recipient: visit.tenant,
+          recipientModel: "Tenant",
+          type: "reschedule_accepted_by_owner",
+          title: "Reschedule accepted",
+          message: `Owner accepted the reschedule for property ${visit.property}`,
+          data: {
+            visitRequestId: visit._id.toString(),
+            propertyId: visit.property.toString(),
+          },
+          relatedId: visit._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify tenant about owner reschedule acceptance:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
   } catch (error) {
     console.error("Error accepting reschedule:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -899,6 +967,29 @@ const rejectRescheduleRequest = async (req, res) => {
       message: "Reschedule rejected successfully",
       data: visit,
     });
+    // Notify tenant that owner rejected the reschedule
+    (async () => {
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.createNotification({
+          recipient: visit.tenant,
+          recipientModel: "Tenant",
+          type: "reschedule_rejected_by_owner",
+          title: "Reschedule rejected",
+          message: `Owner rejected the reschedule for property ${visit.property}`,
+          data: {
+            visitRequestId: visit._id.toString(),
+            propertyId: visit.property.toString(),
+          },
+          relatedId: visit._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify tenant about owner reschedule rejection:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
   } catch (error) {
     console.error("Error rejecting reschedule:", error);
     res.status(500).json({
@@ -976,6 +1067,29 @@ const RescheduleVisit = async (req, res) => {
 
     await visit.save();
 
+    // Notify tenant about owner-initiated reschedule
+    (async () => {
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.createNotification({
+          recipient: visit.tenant,
+          recipientModel: "Tenant",
+          type: "visit_rescheduled_by_owner",
+          title: "Visit rescheduled",
+          message: `Owner has rescheduled the visit for property ${visit.property}`,
+          data: {
+            visitRequestId: visit._id.toString(),
+            propertyId: visit.property.toString(),
+          },
+          relatedId: visit._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify tenant about owner reschedule:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
     return res.status(200).json({
       success: true,
       message: "Visit rescheduled successfully",
@@ -1278,7 +1392,6 @@ const updateDocument = async (req, res) => {
   }
 };
 
-// 🚀 Multi-Step Profile Setup Methods
 
 // Initialize Profile Setup
 const initializeProfileSetup = async (req, res) => {
@@ -1735,7 +1848,6 @@ const getSetupStatus = async (req, res) => {
   }
 };
 
-
 module.exports = {
   getProfile,
   createProfile,
@@ -1768,5 +1880,5 @@ module.exports = {
   getSetupStatus,
   verifyVisitRequest,
   actionOnInviteFromTenant,
-  inviteToTenant
+  inviteToTenant,
 };

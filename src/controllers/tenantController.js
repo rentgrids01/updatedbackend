@@ -13,6 +13,8 @@ const {
 const { verifyOTP } = require("../utils/emailService");
 const Invite = require("../models/Invite");
 const Owner = require("../models/Owner");
+const notificationService = require("../services/notificationService");
+
 // Get Profile
 const getProfile = async (req, res) => {
   try {
@@ -668,6 +670,30 @@ const rescheduleRequest = async (req, res) => {
 
     await visit.save();
 
+    // Notify landlord about the reschedule request (non-blocking)
+    (async () => {
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.createNotification({
+          recipient: visit.landlord,
+          recipientModel: "Owner",
+          type: "visit_rescheduled",
+          title: "Visit reschedule requested",
+          message: `Tenant has requested a reschedule for property ${visit.property}`,
+          data: {
+            visitRequestId: visit._id.toString(),
+            propertyId: visit.property.toString(),
+          },
+          relatedId: visit._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to create notification for reschedule request:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
+
     return res.status(200).json({
       success: true,
       message: "Visit rescheduled successfully",
@@ -712,6 +738,29 @@ const acceptRescheduleRequest = async (req, res) => {
       message: "Reschedule accepted successfully",
       data: visit,
     });
+    // Notify landlord that tenant accepted the reschedule (non-blocking)
+    (async () => {
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.createNotification({
+          recipient: visit.landlord,
+          recipientModel: "Owner",
+          type: "reschedule_accepted_by_tenant",
+          title: "Reschedule accepted",
+          message: `Tenant accepted the rescheduled visit for property ${visit.property}`,
+          data: {
+            visitRequestId: visit._id.toString(),
+            propertyId: visit.property.toString(),
+          },
+          relatedId: visit._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify landlord about tenant acceptance:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
   } catch (error) {
     console.error("Error accepting reschedule:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -749,6 +798,29 @@ const rejectRescheduleRequest = async (req, res) => {
       message: "Reschedule rejected successfully",
       data: visit,
     });
+    // Notify landlord that tenant rejected the reschedule (non-blocking)
+    (async () => {
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.createNotification({
+          recipient: visit.landlord,
+          recipientModel: "Owner",
+          type: "reschedule_rejected_by_tenant",
+          title: "Reschedule rejected",
+          message: `Tenant rejected the rescheduled visit for property ${visit.property}`,
+          data: {
+            visitRequestId: visit._id.toString(),
+            propertyId: visit.property.toString(),
+          },
+          relatedId: visit._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify landlord about tenant rejection:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
   } catch (error) {
     console.error("Error rejecting reschedule:", error);
     res.status(500).json({
@@ -1173,153 +1245,6 @@ const updateApplicationStep3 = async (req, res) => {
   }
 };
 
-// Schedule Visit Request
-// const createscheduleVisitRequest = async (req, res) => {
-//   try {
-//     const tenantId = req.user._id;
-//     const { property, scheduledDate, slots, status, notes } = req.body;
-//     const propertyDoc = await Property.findById(property);
-
-//     if (!propertyDoc) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Property not found" });
-//     }
-
-//     const landlordId = propertyDoc?.owner;
-
-//     // Validate required fields
-//     if (
-//       !tenantId ||
-//       !property ||
-//       !scheduledDate ||
-//       !slots ||
-//       slots.length === 0
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "property, scheduledDate, and slots are required",
-//       });
-//     }
-
-//     // Check if landlord has set up their schedule for this property
-//     if (!propertyDoc.landlordSchedule) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Landlord has not set up their availability schedule for this property. Please contact the landlord.",
-//       });
-//     }
-
-//     const { scheduledDate: landlordDate, slots: landlordSlots } =
-//       propertyDoc.landlordSchedule;
-
-//     // Convert dates to compare (normalize to just date, ignore time)
-//     const requestedDate = new Date(scheduledDate);
-//     requestedDate.setHours(0, 0, 0, 0);
-
-//     const availableDate = new Date(landlordDate);
-//     availableDate.setHours(0, 0, 0, 0);
-
-//     // Check if the requested date matches landlord's available date
-//     if (requestedDate.getTime() !== availableDate.getTime()) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Visit can only be scheduled on ${availableDate.toDateString()}. Please select from the landlord's available dates.`,
-//       });
-//     }
-
-//     // Extract available time slots from landlord's schedule
-//     const availableTimeSlots = landlordSlots.map((slot) => slot.scheduledTime);
-
-//     // Check if all requested time slots are available in landlord's schedule
-//     const requestedTimeSlots = slots.map((slot) => slot.scheduledTime);
-//     const invalidSlots = requestedTimeSlots.filter(
-//       (time) => !availableTimeSlots.includes(time)
-//     );
-
-//     if (invalidSlots.length > 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `The following time slots are not available: ${invalidSlots.join(
-//           ", "
-//         )}. Available slots are: ${availableTimeSlots.join(", ")}`,
-//       });
-//     }
-
-//     // Check for existing visit requests for the same property, date, and time slots
-//     const existingSlot = await VisitRequest.findOne({
-//       tenant: tenantId,
-//       property,
-//       scheduledDate,
-//       slots: {
-//         $elemMatch: {
-//           scheduledTime: { $in: requestedTimeSlots },
-//         },
-//       },
-//       status: { $in: ["pending", "scheduled"] },
-//     });
-
-//     if (existingSlot) {
-//       return res.status(409).json({
-//         success: false,
-//         message: "You already have a visit request for this exact time slot.",
-//       });
-//     }
-
-//     // Check if any of the requested slots are already booked by other tenants
-//     const conflictingVisits = await VisitRequest.find({
-//       property,
-//       scheduledDate,
-//       slots: {
-//         $elemMatch: {
-//           scheduledTime: { $in: requestedTimeSlots },
-//         },
-//       },
-//       status: { $in: ["pending", "scheduled", "landlord_approved"] },
-//       tenant: { $ne: tenantId }, // Exclude current tenant
-//     });
-
-//     if (conflictingVisits.length > 0) {
-//       const bookedSlots = conflictingVisits.flatMap((visit) =>
-//         visit.slots
-//           .filter((slot) => requestedTimeSlots.includes(slot.scheduledTime))
-//           .map((slot) => slot.scheduledTime)
-//       );
-
-//       return res.status(409).json({
-//         success: false,
-//         message: `The following time slots are already booked: ${[
-//           ...new Set(bookedSlots),
-//         ].join(", ")}. Please choose different time slots.`,
-//       });
-//     }
-
-//     const visitRequest = await VisitRequest.create({
-//       tenant: tenantId,
-//       landlord: landlordId,
-//       property,
-//       scheduledDate,
-//       slots,
-//       notes,
-//       status: status || "pending",
-//     });
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Visit request scheduled successfully",
-//       data: visitRequest,
-//     });
-//   } catch (error) {
-//     console.error("Error scheduling visit request:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to schedule visit request",
-//       error: error.message,
-//     });
-//   }
-// };
-
 const createscheduleVisitRequest = async (req, res) => {
   try {
     const tenantId = req.user._id;
@@ -1458,6 +1383,31 @@ const createscheduleVisitRequest = async (req, res) => {
       status: status || "pending",
     });
 
+    // Notify landlord about the new visit request (non-blocking)
+    (async () => {
+      try {
+        await notificationService.createNotification({
+          recipient: landlordId,
+          recipientModel: "Owner",
+          type: "visit_request_scheduled",
+          title: "New visit request",
+          message: `A tenant scheduled a visit request for your property ${
+            propertyDoc.title || ""
+          }`,
+          data: {
+            visitRequestId: visitRequest._id.toString(),
+            propertyId: property.toString(),
+          },
+          relatedId: visitRequest._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify landlord about new visit request:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
+
     return res.status(201).json({
       success: true,
       message: "Visit request scheduled successfully",
@@ -1550,6 +1500,31 @@ const handleInviteAction = async (req, res) => {
 
     invite.updatedAt = new Date();
     await invite.save();
+    // Notify owner about tenant's action on the invite (non-blocking)
+    (async () => {
+      try {
+        await notificationService.createNotification({
+          recipient: invite.owner,
+          recipientModel: "Owner",
+          type:
+            action === "accept"
+              ? "invite_accepted_by_tenant"
+              : "invite_rejected_by_tenant",
+          title: action === "accept" ? "Invite accepted" : "Invite rejected",
+          message: `Tenant has ${action}ed the invite for property ${invite.property}`,
+          data: {
+            inviteId: invite._id?.toString(),
+            propertyId: invite.property?.toString(),
+          },
+          relatedId: invite._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify owner about invite action:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
 
     res.json({
       success: true,
@@ -1662,6 +1637,29 @@ const inviteToOwner = async (req, res) => {
     });
 
     await newInvite.save();
+    // Notify owner about the invite sent by tenant (non-blocking)
+    (async () => {
+      try {
+        await notificationService.createNotification({
+          recipient: ownerId,
+          recipientModel: "Owner",
+          type: "invite_sent_by_tenant",
+          title: "New invite received",
+          message: `A tenant has sent you an invite for property ${propertyId}`,
+          data: {
+            inviteId: newInvite._id?.toString(),
+            propertyId: propertyId?.toString(),
+            visitRequestId: visitRequest._id?.toString(),
+          },
+          relatedId: newInvite._id,
+        });
+      } catch (err) {
+        console.error(
+          "Failed to notify owner about invite:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
 
     res.status(201).json({
       success: true,
