@@ -1,7 +1,8 @@
-const VisitRequest = require('../models/VisitRequest');
-const Property = require('../models/Property');
-const Payment = require('../models/Payment');
-const Razorpay = require('razorpay');
+const VisitRequest = require("../models/VisitRequest");
+const Property = require("../models/Property");
+const Payment = require("../models/Payment");
+const Razorpay = require("razorpay");
+const notificationService = require("../services/notificationService");
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -11,19 +12,14 @@ const razorpay = new Razorpay({
 // Create Visit Request
 const createVisitRequest = async (req, res) => {
   try {
-    const {
-      propertyId,
-      preferredSlots,
-      notes,
-      coApplicants,
-      consents
-    } = req.body;
+    const { propertyId, preferredSlots, notes, coApplicants, consents } =
+      req.body;
 
     const property = await Property.findById(propertyId);
     if (!property) {
       return res.status(404).json({
         success: false,
-        message: 'Property not found'
+        message: "Property not found",
       });
     }
 
@@ -35,9 +31,35 @@ const createVisitRequest = async (req, res) => {
       notes,
       coApplicants,
       consents,
-      status: 'submitted',
-      progress: 20
+      status: "submitted",
+      progress: 20,
     });
+
+    // Fire-and-forget: create a notification for the landlord about the new visit request
+    (async () => {
+      try {
+        await notificationService.createNotification({
+          recipient: property.owner,
+          recipientModel: "Owner",
+          type: "visit_request_submitted",
+          title: "New visit request",
+          message: `A tenant has requested a visit for your property ${
+            property.title || ""
+          }`,
+          data: {
+            visitRequestId: visitRequest._id.toString(),
+            propertyId: propertyId.toString(),
+          },
+          relatedId: visitRequest._id,
+        });
+      } catch (err) {
+        // non-blocking: log and continue
+        console.error(
+          "Failed to create notification for visit request:",
+          err && err.message ? err.message : err
+        );
+      }
+    })();
 
     res.status(201).json({
       success: true,
@@ -47,22 +69,22 @@ const createVisitRequest = async (req, res) => {
         payment: {
           required: visitRequest.paymentRequired,
           amount: visitRequest.paymentAmount,
-          currency: 'INR',
-          status: visitRequest.paymentStatus
+          currency: "INR",
+          status: visitRequest.paymentStatus,
         },
         timeline: [
           {
-            code: 'application_submitted',
-            label: 'Application Submitted',
-            at: visitRequest.createdAt
-          }
-        ]
-      }
+            code: "application_submitted",
+            label: "Application Submitted",
+            at: visitRequest.createdAt,
+          },
+        ],
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -71,18 +93,18 @@ const createVisitRequest = async (req, res) => {
 const getVisitRequests = async (req, res) => {
   try {
     const { status } = req.query;
-    
+
     const query = { tenant: req.user._id };
     if (status) {
       query.status = status;
     }
 
     const visitRequests = await VisitRequest.find(query)
-      .populate('property', 'title location images monthlyRent propertyId')
-      .populate('landlord', 'fullName emailId phonenumber')
+      .populate("property", "title location images monthlyRent propertyId")
+      .populate("landlord", "fullName emailId phonenumber")
       .sort({ createdAt: -1 });
 
-    const formattedRequests = visitRequests.map(visit => ({
+    const formattedRequests = visitRequests.map((visit) => ({
       id: visit._id,
       status: visit.status,
       requestedAt: visit.createdAt,
@@ -91,23 +113,23 @@ const getVisitRequests = async (req, res) => {
         title: visit.property.title,
         city: visit.property.location?.city,
         price: visit.property.monthlyRent,
-        thumb: visit.property.images?.[0]
+        thumb: visit.property.images?.[0],
       },
       progress: visit.progress,
       latestAction: {
         type: getLatestActionType(visit.status),
-        dueAt: getActionDueDate(visit)
-      }
+        dueAt: getActionDueDate(visit),
+      },
     }));
 
     res.json({
       success: true,
-      data: formattedRequests
+      data: formattedRequests,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -118,20 +140,23 @@ const getVisitRequestDetails = async (req, res) => {
     const { id } = req.params;
 
     const visitRequest = await VisitRequest.findById(id)
-      .populate('property', 'title location images monthlyRent securityDeposit propertyId')
-      .populate('landlord', 'fullName emailId phonenumber');
+      .populate(
+        "property",
+        "title location images monthlyRent securityDeposit propertyId"
+      )
+      .populate("landlord", "fullName emailId phonenumber");
 
     if (!visitRequest) {
       return res.status(404).json({
         success: false,
-        message: 'Visit request not found'
+        message: "Visit request not found",
       });
     }
 
     if (visitRequest.tenant.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
 
@@ -149,22 +174,22 @@ const getVisitRequestDetails = async (req, res) => {
           address: visitRequest.property.location?.fullAddress,
           rent: visitRequest.property.monthlyRent,
           deposit: visitRequest.property.securityDeposit,
-          images: visitRequest.property.images
+          images: visitRequest.property.images,
         },
         proposedSlots: visitRequest.preferredSlots,
         selectedSlot: visitRequest.selectedSlot,
         payment: {
           required: visitRequest.paymentRequired,
           amount: visitRequest.paymentAmount,
-          status: visitRequest.paymentStatus
+          status: visitRequest.paymentStatus,
         },
-        timeline
-      }
+        timeline,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -179,18 +204,18 @@ const cancelVisitRequest = async (req, res) => {
     if (!visitRequest) {
       return res.status(404).json({
         success: false,
-        message: 'Visit request not found'
+        message: "Visit request not found",
       });
     }
 
     if (visitRequest.tenant.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
 
-    visitRequest.status = 'cancelled_by_tenant';
+    visitRequest.status = "cancelled_by_tenant";
     visitRequest.reasonCode = reasonCode;
     visitRequest.reasonText = reasonText;
     visitRequest.updatedAt = new Date();
@@ -198,12 +223,12 @@ const cancelVisitRequest = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Visit request cancelled successfully'
+      message: "Visit request cancelled successfully",
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -212,20 +237,20 @@ const cancelVisitRequest = async (req, res) => {
 const createPaymentIntent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { method, amount, currency = 'INR', returnUrl } = req.body;
+    const { method, amount, currency = "INR", returnUrl } = req.body;
 
     const visitRequest = await VisitRequest.findById(id);
     if (!visitRequest) {
       return res.status(404).json({
         success: false,
-        message: 'Visit request not found'
+        message: "Visit request not found",
       });
     }
 
     if (visitRequest.tenant.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
 
@@ -236,22 +261,22 @@ const createPaymentIntent = async (req, res) => {
       receipt: `visit_${id}`,
       notes: {
         visitRequestId: id,
-        tenantId: req.user._id.toString()
-      }
+        tenantId: req.user._id.toString(),
+      },
     });
 
     // Create payment record
     const payment = await Payment.create({
       paymentId: `pay_${Date.now()}`,
       userId: req.user._id,
-      userType: 'tenant',
+      userType: "tenant",
       visitRequestId: id,
       amount,
       currency,
       method,
-      gateway: 'razorpay',
+      gateway: "razorpay",
       gatewayOrderId: order.id,
-      returnUrl
+      returnUrl,
     });
 
     // Update visit request
@@ -262,17 +287,17 @@ const createPaymentIntent = async (req, res) => {
       success: true,
       data: {
         paymentId: payment.paymentId,
-        gateway: 'razorpay',
-        status: 'pending',
+        gateway: "razorpay",
+        status: "pending",
         orderId: order.id,
         amount,
-        currency
-      }
+        currency,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -286,7 +311,7 @@ const getPaymentStatus = async (req, res) => {
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Payment not found'
+        message: "Payment not found",
       });
     }
 
@@ -295,13 +320,13 @@ const getPaymentStatus = async (req, res) => {
       data: {
         paymentId: payment.paymentId,
         status: payment.status,
-        paidAt: payment.paidAt
-      }
+        paidAt: payment.paidAt,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -316,18 +341,18 @@ const reapplyVisitRequest = async (req, res) => {
     if (!visitRequest) {
       return res.status(404).json({
         success: false,
-        message: 'Visit request not found'
+        message: "Visit request not found",
       });
     }
 
     if (visitRequest.tenant.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
 
-    visitRequest.status = 'submitted';
+    visitRequest.status = "submitted";
     visitRequest.preferredSlots = preferredSlots;
     visitRequest.progress = 20;
     visitRequest.updatedAt = new Date();
@@ -335,13 +360,13 @@ const reapplyVisitRequest = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Visit request reapplied successfully',
-      data: visitRequest
+      message: "Visit request reapplied successfully",
+      data: visitRequest,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -349,26 +374,26 @@ const reapplyVisitRequest = async (req, res) => {
 // Helper functions
 const getLatestActionType = (status) => {
   const actionMap = {
-    'submitted': 'profile_verification',
-    'profile_verified': 'awaiting_landlord_review',
-    'landlord_reviewing': 'awaiting_landlord_review',
-    'visit_requested': 'awaiting_payment',
-    'landlord_approved': 'awaiting_tenant_confirmation',
-    'landlord_rejected': 'request_rejected',
-    'scheduled': 'visit_scheduled',
-    'completed': 'visit_completed'
+    submitted: "profile_verification",
+    profile_verified: "awaiting_landlord_review",
+    landlord_reviewing: "awaiting_landlord_review",
+    visit_requested: "awaiting_payment",
+    landlord_approved: "awaiting_tenant_confirmation",
+    landlord_rejected: "request_rejected",
+    scheduled: "visit_scheduled",
+    completed: "visit_completed",
   };
-  return actionMap[status] || 'unknown';
+  return actionMap[status] || "unknown";
 };
 
 const getActionDueDate = (visit) => {
   const now = new Date();
   const createdAt = new Date(visit.createdAt);
-  
+
   switch (visit.status) {
-    case 'submitted':
+    case "submitted":
       return new Date(createdAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours
-    case 'landlord_reviewing':
+    case "landlord_reviewing":
       return new Date(createdAt.getTime() + 48 * 60 * 60 * 1000); // 48 hours
     default:
       return null;
@@ -378,35 +403,56 @@ const getActionDueDate = (visit) => {
 const generateTimeline = (visitRequest) => {
   const timeline = [
     {
-      code: 'application_submitted',
-      label: 'Application Submitted',
+      code: "application_submitted",
+      label: "Application Submitted",
       at: visitRequest.createdAt,
-      state: 'done'
-    }
+      state: "done",
+    },
   ];
 
-  if (['profile_verified', 'landlord_reviewing', 'visit_requested', 'landlord_approved', 'scheduled', 'completed'].includes(visitRequest.status)) {
+  if (
+    [
+      "profile_verified",
+      "landlord_reviewing",
+      "visit_requested",
+      "landlord_approved",
+      "scheduled",
+      "completed",
+    ].includes(visitRequest.status)
+  ) {
     timeline.push({
-      code: 'profile_verification',
-      label: 'Profile Verification Completed',
+      code: "profile_verification",
+      label: "Profile Verification Completed",
       at: visitRequest.createdAt,
-      state: 'done'
+      state: "done",
     });
   }
 
-  if (['landlord_reviewing', 'visit_requested', 'landlord_approved', 'scheduled', 'completed'].includes(visitRequest.status)) {
+  if (
+    [
+      "landlord_reviewing",
+      "visit_requested",
+      "landlord_approved",
+      "scheduled",
+      "completed",
+    ].includes(visitRequest.status)
+  ) {
     timeline.push({
-      code: 'landlord_review',
-      label: 'Landlord Reviewing',
-      state: visitRequest.status === 'landlord_reviewing' ? 'active' : 'done'
+      code: "landlord_review",
+      label: "Landlord Reviewing",
+      state: visitRequest.status === "landlord_reviewing" ? "active" : "done",
     });
   }
 
-  if (['visit_requested', 'landlord_approved', 'scheduled', 'completed'].includes(visitRequest.status)) {
+  if (
+    ["visit_requested", "landlord_approved", "scheduled", "completed"].includes(
+      visitRequest.status
+    )
+  ) {
     timeline.push({
-      code: 'visit_request',
-      label: 'Visit Request',
-      state: visitRequest.status === 'visit_requested' ? 'active' : 'done'
+      code: "visit_request",
+      label: "Visit Request",
+      state: visitRequest.status === "visit_requested" ? "active" : "done",
     });
   }
 
@@ -420,5 +466,5 @@ module.exports = {
   cancelVisitRequest,
   createPaymentIntent,
   getPaymentStatus,
-  reapplyVisitRequest
+  reapplyVisitRequest,
 };
