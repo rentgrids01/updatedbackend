@@ -18,6 +18,7 @@ const {
 const {
   calculateProfileScoreOwner,
 } = require("../utils/calculateProfileScore");
+const Invite = require("../models/Invite");
 // Get Dashboard
 
 const getDashboard = async (req, res) => {
@@ -662,6 +663,14 @@ const verifyVisitRequest = async (req, res) => {
     visitRequest.updatedAt = new Date();
     await visitRequest.save();
 
+    const invite = await Invite.create({
+      tenant: visitRequest.tenant._id,
+      owner: visitRequest.landlord._id,
+      property: visitRequest.property,
+      visit: visitRequest._id,
+      createdAt: new Date(),
+    });
+
     res.json({
       success: true,
       message: "Visit verification successful. Visit marked as completed.",
@@ -680,6 +689,133 @@ const verifyVisitRequest = async (req, res) => {
     });
   }
 };
+
+// const allInvites = async (req, res) => {
+//   try {
+//     const ownerId = req.user._id;
+//     const invite = await Invite.find()
+//       .populate("tenant", "fullName emailId")
+//       .populate("property", "title location");
+
+//     res.json({
+//       success: true,
+//       message: "Finalized offers retrieved successfully",
+//       data: invite,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching finalized offers:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// };
+
+const inviteToTenant = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { tenantId } = req.body;
+    const visitRequest = await VisitRequest.findOne({
+      tenant: tenantId,
+      landlord: ownerId,
+      status: { $in: ["completed"] },
+    });
+    console.log("visitRequest", visitRequest);
+    if (!visitRequest) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "No approved or scheduled visit request found for this tenant and property",
+      });
+    }
+
+    const propertyId = visitRequest.property;
+
+    const newInvite = new Invite({
+      owner: ownerId,
+      property: propertyId,
+      tenant: tenantId,
+      visit: visitRequest._id,
+    });
+
+    await newInvite.save();
+    
+    res.status(201).json({
+      success: true,
+      message: "Invite sent to Tenant successfully",
+      invite: newInvite,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to send invite",
+      error: error.message,
+    });
+  }
+};
+
+const actionOnInviteFromTenant = async (req, res) => {
+   try {
+      const { inviteId } = req.params;
+      const { action } = req.body;
+      const ownerId = req.user._id;
+  
+      // Find the offer
+      const invite = await Invite.findById(inviteId).select("-tenantInviteStatus");;
+  
+      if (!invite) {
+        return res.status(404).json({
+          success: false,
+          message: "Invite not found",
+        });
+      }
+  
+      if (!invite.owner || invite.owner.toString() !== ownerId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorized to act on this invitation",
+        });
+      }
+  
+      if (
+        (action === "accept" && invite.ownerInviteStatus === "rejected") ||
+        (action === "reject" && invite.ownerInviteStatus === "accepted")
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot ${action} an offer that is already ${invite.ownerInviteStatus}`,
+        });
+      }
+  
+      // Handle the action
+      if (action === "accept") {
+        invite.ownerInviteStatus = "accepted";
+      } else if (action === "reject") {
+        invite.ownerInviteStatus = "rejected";
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid action. Use 'accept' or 'reject'.",
+        });
+      }
+  
+      invite.updatedAt = new Date();
+      await invite.save();
+  
+      res.json({
+        success: true,
+        message: `Invite successfully ${action}ed`,
+        data: invite,
+      });
+    } catch (error) {
+      console.error("Error handling offer action:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to handle offer action",
+        error: error.message,
+      });
+    }
+}
 
 // Accept Reschedule Request
 const acceptRescheduleRequest = async (req, res) => {
@@ -1599,6 +1735,7 @@ const getSetupStatus = async (req, res) => {
   }
 };
 
+
 module.exports = {
   getProfile,
   createProfile,
@@ -1630,4 +1767,6 @@ module.exports = {
   finalizeProfileSetup,
   getSetupStatus,
   verifyVisitRequest,
+  actionOnInviteFromTenant,
+  inviteToTenant
 };

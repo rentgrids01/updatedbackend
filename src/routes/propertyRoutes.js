@@ -27,6 +27,7 @@ router.post(
   "/",
   auth,
   requireRole(["landlord"]),
+  upload.none(),
   createProperty
 );
 

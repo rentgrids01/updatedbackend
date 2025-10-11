@@ -25,6 +25,10 @@ const {
   rejectRescheduleRequest,
   createscheduleVisitRequest,
   getVisitRequestStatus,
+  handleInviteAction,
+  inviteToOwner,
+  getAllOwner,
+  allInvites
 } = require("../controllers/tenantController");
 
 const {
@@ -139,4 +143,14 @@ router.patch(
   "/visit-requests/:requestId/reject-reschedule",
   rejectRescheduleRequest
 );
+
+router.get('/invites-from-owner',allInvites)
+
+router.get('/owners-list',getAllOwner)
+
+// sent invite to owner -> owner's display in offer
+router.post('/invite-to-owner',inviteToOwner)
+
+// accept and reject invites -> display in offer
+router.patch('/invite-from-owner/:inviteId/action',handleInviteAction)
 module.exports = router;
