@@ -11,6 +11,8 @@ const {
   getChatbotResponse,
 } = require("../utils/faqService");
 const { verifyOTP } = require("../utils/emailService");
+const Invite = require("../models/Invite");
+const Owner = require("../models/Owner");
 // Get Profile
 const getProfile = async (req, res) => {
   try {
@@ -1494,6 +1496,181 @@ const getVisitRequestStatus = async (req, res) => {
   }
 };
 
+// Accept and Reject Invites from owner
+const handleInviteAction = async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const { action } = req.body;
+    const tenantId = req.user._id;
+
+    // Find the offer
+    const invite = await Invite.findById(inviteId).select("-ownerInviteStatus");
+
+    if (!invite) {
+      return res.status(404).json({
+        success: false,
+        message: "Invite not found",
+      });
+    }
+
+    if (!invite.tenant || invite.tenant.toString() !== tenantId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to act on this invitation",
+      });
+    }
+
+    if (
+      (action === "accept" && invite.tenantInviteStatus === "rejected") ||
+      (action === "reject" && invite.tenantInviteStatus === "accepted")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot ${action} an offer that is already ${invite.tenantInviteStatus}`,
+      });
+    }
+
+    // Handle the action
+    if (action === "accept") {
+      invite.tenantInviteStatus = "accepted";
+    } else if (action === "reject") {
+      invite.tenantInviteStatus = "rejected";
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Use 'accept' or 'reject'.",
+      });
+    }
+
+    invite.updatedAt = new Date();
+    await invite.save();
+
+    res.json({
+      success: true,
+      message: `Invite successfully ${action}ed`,
+      data: invite,
+    });
+  } catch (error) {
+    console.error("Error handling offer action:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to handle offer action",
+      error: error.message,
+    });
+  }
+};
+
+const allInvites = async (req, res) => {
+  try {
+    const tenantId = req.user._id;
+
+    // Find all invites for the logged-in tenant
+    const invites = await Invite.find({ tenant: tenantId })
+      .populate("owner", "fullName emailId") // populate owner details
+      .populate("property", "title location") // populate property details
+      .sort({ createdAt: -1 }); // latest first
+
+    if (!invites.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No invites found for this tenant",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Invites retrieved successfully",
+      data: invites,
+    });
+  } catch (error) {
+    console.error("Error fetching invites:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch invites",
+      error: error.message,
+    });
+  }
+};
+
+const getAllOwner = async (req, res) => {
+  try {
+    const tenantId = req.user._id;
+
+    if (!tenantId) {
+      return res.status(401).json({
+        success: false,
+        message: "unauthorized",
+      });
+    }
+
+    // Fetch all owners (you can also add filters or pagination if needed)
+    const owners = await Owner.find().select("-password"); // exclude password for security
+
+    if (!owners || owners.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No owners found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Owners fetched successfully",
+      owners,
+    });
+  } catch (error) {
+    console.error("Error fetching owners:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch owners",
+      error: error.message,
+    });
+  }
+};
+
+const inviteToOwner = async (req, res) => {
+  try {
+    const tenantId = req.user._id;
+    const { ownerId } = req.body;
+    const visitRequest = await VisitRequest.findOne({
+      tenant: tenantId,
+      landlord: ownerId,
+      status: { $in: ["completed"] },
+    });
+    console.log("visitRequest", visitRequest);
+    if (!visitRequest) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "No approved or scheduled visit request found for this tenant and property",
+      });
+    }
+
+    const propertyId = visitRequest.property;
+
+    const newInvite = new Invite({
+      owner: ownerId,
+      property: propertyId,
+      tenant: tenantId,
+      visit: visitRequest._id,
+    });
+
+    await newInvite.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Invite sent to owner successfully",
+      invite: newInvite,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to send invite",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   createProfile,
@@ -1520,4 +1697,8 @@ module.exports = {
   updateApplicationStep3,
   createscheduleVisitRequest,
   getVisitRequestStatus,
+  handleInviteAction,
+  inviteToOwner,
+  getAllOwner,
+  allInvites,
 };

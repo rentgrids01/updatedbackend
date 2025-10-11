@@ -29,7 +29,9 @@ const {
   uploadIdDocument,
   finalizeProfileSetup,
   getSetupStatus,
-  verifyVisitRequest
+  verifyVisitRequest,
+  inviteToTenant,
+  actionOnInviteFromTenant
 } = require("../controllers/ownerController");
 const { auth, requireUserType } = require("../middleware/auth");
 const upload = require("../middleware/upload");
@@ -94,5 +96,10 @@ router.patch(
 
 // Reschedule Visit Request
 router.patch("/visit-requests/:requestId/reschedule", RescheduleVisit);
+
+
+// Get all offers for owner
+router.post('/invites-to-tenant',inviteToTenant)
+router.patch('/invites-from-tenant/:inviteId/action',actionOnInviteFromTenant)
 
 module.exports = router;
