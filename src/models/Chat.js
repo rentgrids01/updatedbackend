@@ -120,16 +120,27 @@ chatSchema.statics.findUserChats = function(userId) {
 
 // Static method to find or create a chat between two users
 chatSchema.statics.findOrCreateChat = async function(user1Id, user2Id) {
+  const mongoose = require('mongoose');
+  
+  // Ensure we have valid ObjectIds
+  if (!user1Id || !user2Id) {
+    throw new Error('Both user IDs are required');
+  }
+  
+  // Convert to ObjectIds if they're strings
+  const userId1 = mongoose.Types.ObjectId.isValid(user1Id) ? user1Id : new mongoose.Types.ObjectId(user1Id);
+  const userId2 = mongoose.Types.ObjectId.isValid(user2Id) ? user2Id : new mongoose.Types.ObjectId(user2Id);
+  
   // First, try to find existing chat between these two users
   let chat = await this.findOne({
     isGroupChat: false,
-    participants: { $all: [user1Id, user2Id], $size: 2 }
+    participants: { $all: [userId1, userId2], $size: 2 }
   });
 
   // If no chat exists, create a new one
   if (!chat) {
     chat = new this({
-      participants: [user1Id, user2Id],
+      participants: [userId1, userId2],
       isGroupChat: false
     });
     await chat.save();

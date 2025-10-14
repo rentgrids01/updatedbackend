@@ -14,27 +14,30 @@ require("dotenv").config();
 // Import Passport configuration
 const passport = require("./src/config/passport");
 
-const authRoutes = require("./src/routes/authRoutes");
-const socialAuthRoutes = require("./src/routes/socialAuthRoutes");
-const tenantRoutes = require("./src/routes/tenantRoutes");
-const ownerRoutes = require("./src/routes/ownerRoutes");
-const propertyRoutes = require("./src/routes/propertyRoutes");
-const visitRoutes = require("./src/routes/visitRoutes");
-const subscriptionRoutes = require("./src/routes/subscriptionRoutes");
-const chatRoutes = require("./src/routes/chatRoutes");
-const messageRoutes = require("./src/routes/messageRoutes");
-const userRoutes = require("./src/routes/userRoutes");
-const scheduleRoutes = require("./src/routes/scheduleRoutes");
-const featureRoutes = require("./src/routes/featureRoutes");
-const amenityRoutes = require("./src/routes/amenityRoutes");
-const aiRoutes = require("./src/routes/aiRoutes");
-const adminSubscriptionRoutes = require("./src/routes/adminSubscriptionRoutes");
-const subscriptionCatalogRoutes = require("./src/routes/subscriptionCatalogRoutes");
-const userSubscriptionRoutes = require("./src/routes/userSubscriptionRoutes");
-const subscriptionPaymentRoutes = require("./src/routes/subscriptionPaymentRoutes");
-const webhookRoutes = require("./src/routes/webhookRoutes");
-const contactRoutes = require("./src/routes/contactRoutes");
+const authRoutes = require('./src/routes/authRoutes');
+const socialAuthRoutes = require('./src/routes/socialAuthRoutes');
+const tenantRoutes = require('./src/routes/tenantRoutes');
+const ownerRoutes = require('./src/routes/ownerRoutes');
+const propertyRoutes = require('./src/routes/propertyRoutes');
+const visitRoutes = require('./src/routes/visitRoutes');
+const subscriptionRoutes = require('./src/routes/subscriptionRoutes');
+const chatRoutes = require('./src/routes/chatRoutes');
+const messageRoutes = require('./src/routes/messageRoutes');
+const userRoutes = require('./src/routes/userRoutes');
+const scheduleRoutes = require('./src/routes/scheduleRoutes');
+const featureRoutes = require('./src/routes/featureRoutes');
+const amenityRoutes = require('./src/routes/amenityRoutes');
+const aiRoutes = require('./src/routes/aiRoutes');
+const adminSubscriptionRoutes = require('./src/routes/adminSubscriptionRoutes');
+const subscriptionCatalogRoutes = require('./src/routes/subscriptionCatalogRoutes');
+const userSubscriptionRoutes = require('./src/routes/userSubscriptionRoutes');
+const subscriptionPaymentRoutes = require('./src/routes/subscriptionPaymentRoutes');
+const webhookRoutes = require('./src/routes/webhookRoutes');
+const contactRoutes = require('./src/routes/contactRoutes');
 const notificationRoutes = require("./src/routes/notificationRoutes");
+const propertyInquiryRoutes = require('./src/routes/propertyInquiryRoutes');
+const tenancyInviteRoutes = require('./src/routes/tenancyInviteRoutes');
+const tenantInviteRoutes = require('./src/routes/tenantInviteRoutes');
 
 const errorHandler = require("./src/middleware/errorHandler");
 const socketHandler = require("./src/socket/socketHandler");
@@ -158,27 +161,30 @@ app.get("/health", (req, res) => {
 });
 
 // Routes
-app.use("/api/auth", authRoutes);
-app.use("/auth", socialAuthRoutes); // Social auth routes (no /api prefix for OAuth callbacks)
-app.use("/api/tenant", tenantRoutes);
-app.use("/api/owner", ownerRoutes);
-app.use("/api/properties", propertyRoutes);
-app.use("/api/visits", visitRoutes);
-app.use("/api/subscriptions", subscriptionRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/schedules", scheduleRoutes);
-app.use("/api/features", featureRoutes);
-app.use("/api/amenities", amenityRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/admin", adminSubscriptionRoutes);
-app.use("/api/catalog", subscriptionCatalogRoutes);
-app.use("/api/me", userSubscriptionRoutes);
-app.use("/api/me", subscriptionPaymentRoutes);
-app.use("/api/webhooks", webhookRoutes);
-app.use("/api/contact", contactRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/auth', socialAuthRoutes); // Social auth routes (no /api prefix for OAuth callbacks)
+app.use('/api/tenant', tenantRoutes);
+app.use('/api/owner', ownerRoutes);
+app.use('/api/properties', propertyRoutes);
+app.use('/api/visits', visitRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/schedules', scheduleRoutes);
+app.use('/api/features', featureRoutes);
+app.use('/api/amenities', amenityRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminSubscriptionRoutes);
+app.use('/api/catalog', subscriptionCatalogRoutes);
+app.use('/api/me', userSubscriptionRoutes);
+app.use('/api/me', subscriptionPaymentRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/contact', contactRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use('/api/property-inquiries', propertyInquiryRoutes);
+app.use('/api/tenancy-invites', tenancyInviteRoutes);
+app.use('/api/tenant-invites', tenantInviteRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

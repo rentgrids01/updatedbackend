@@ -253,7 +253,8 @@ const sendMessage = async (req, res) => {
       sender: req.user._id,
       senderModel: req.user.userType === "tenant" ? "Tenant" : "Owner",
       messageType: "text",
-      content
+      content,
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update chat's last message and activity
@@ -308,8 +309,9 @@ const sendMessage = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
+    const { tenancyInviteId } = req.query; // Get tenancy invite ID from query params
     
-    console.log(`[API] Getting messages for chat ${chatId} by user ${req.user._id}`);
+    console.log(`[API] Getting messages for chat ${chatId} by user ${req.user._id}${tenancyInviteId ? ` filtered by tenancy invite ${tenancyInviteId}` : ''}`);
 
     const chat = await Chat.findById(chatId);
     if (!chat) {
@@ -328,15 +330,64 @@ const getMessages = async (req, res) => {
       });
     }
 
-    // Get all messages with proper sorting (oldest first for chronological order)
-    const messages = await Message.find({
+    // Get current user's type
+    let currentUser = await Tenant.findById(req.user._id).select('userType');
+    if (!currentUser) {
+      currentUser = await Owner.findById(req.user._id).select('userType');
+    }
+    
+    if (!currentUser) {
+      console.warn(`[API] User ${req.user._id} not found in Tenant or Owner collections`);
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Build query filter based on user type and tenancy invite context
+    let messageFilter = {
       chat: chatId,
       isDeleted: false
-    })
+    };
+
+    // If tenancyInviteId is provided, filter messages related to that specific invite
+    if (tenancyInviteId) {
+      messageFilter.$or = [
+        { tenancyInviteId: tenancyInviteId }, // Messages linked to this specific invite
+        { tenancyInviteContext: 'none' } // Regular messages (not linked to any invite)
+      ];
+    } else {
+      // If current user is a tenant, filter to show only relevant messages
+      if (currentUser.userType === 'tenant') {
+        messageFilter.$or = [
+          { tenancyInviteContext: 'none' }, // Regular messages
+          { tenancyInviteContext: 'invite_message' }, // Owner invite messages
+          { tenancyInviteContext: 'tenant_only' }, // Tenant-specific messages
+          { tenancyInviteContext: 'tenant_application' } // Tenant application messages
+        ];
+      }
+      // If current user is an owner, show all messages except tenant-only
+      else if (currentUser.userType === 'owner') {
+        messageFilter.$or = [
+          { tenancyInviteContext: 'none' }, // Regular messages
+          { tenancyInviteContext: 'invite_message' }, // Owner invite messages
+          { tenancyInviteContext: 'owner_only' }, // Owner-specific messages
+          { tenancyInviteContext: 'tenant_application' } // Tenant application messages
+        ];
+      }
+    }
+
+    // Get all messages with proper sorting (oldest first for chronological order)
+    const messages = await Message.find(messageFilter)
       .sort({ createdAt: 1 }) // ASC order as requested
       .lean(); // Use lean for better performance
 
-    console.log(`[API] Found ${messages.length} messages in chat ${chatId}`);
+    console.log(`[API] Found ${messages.length} messages in chat ${chatId}${tenancyInviteId ? ` for tenancy invite ${tenancyInviteId}` : ''}`);
+    
+    if (tenancyInviteId) {
+      const inviteMessages = messages.filter(m => m.tenancyInviteId);
+      console.log(`[API] ${inviteMessages.length} messages are linked to tenancy invites`);
+    }
 
     // Manually populate sender details from both Tenant and Owner collections
     const messagesWithFullDetails = await Promise.all(
@@ -417,7 +468,8 @@ const getMessages = async (req, res) => {
         messages: messagesWithFullDetails,
         totalMessages: messages.length,
         participants: chat.participants,
-        lastActivity: chat.lastActivity
+        lastActivity: chat.lastActivity,
+        filteredByTenancyInvite: tenancyInviteId ? tenancyInviteId : null
       }
     });
   } catch (error) {
@@ -471,7 +523,8 @@ const sendPhotoMessage = async (req, res) => {
       imageUrl: result.url,
       fileName: result.filename,
       fileSize: req.file.size,
-      fileMimeType: req.file.mimetype
+      fileMimeType: req.file.mimetype,
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update chat
@@ -557,7 +610,8 @@ const sendLocationMessage = async (req, res) => {
         latitude: lat,
         longitude: lng,
         address: address || ""
-      }
+      },
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update chat
@@ -649,7 +703,8 @@ const sendVideoMessage = async (req, res) => {
       videoUrl: result.url,
       fileName: result.filename,
       fileSize: req.file.size,
-      fileMimeType: req.file.mimetype
+      fileMimeType: req.file.mimetype,
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update chat
@@ -741,7 +796,8 @@ const sendDocumentMessage = async (req, res) => {
       documentUrl: result.url,
       fileName: result.filename,
       fileSize: req.file.size,
-      fileMimeType: req.file.mimetype
+      fileMimeType: req.file.mimetype,
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update chat
@@ -833,7 +889,8 @@ const sendAudioMessage = async (req, res) => {
       audioUrl: result.url,
       fileName: result.filename,
       fileSize: req.file.size,
-      fileMimeType: req.file.mimetype
+      fileMimeType: req.file.mimetype,
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update chat
@@ -990,7 +1047,8 @@ const forwardMessage = async (req, res) => {
       fileName: sourceMessage.fileName,
       fileSize: sourceMessage.fileSize,
       fileMimeType: sourceMessage.fileMimeType,
-      forwardedFrom: messageId
+      forwardedFrom: messageId,
+      tenancyInviteContext: 'none', // Regular message
     });
 
     // Update target chat

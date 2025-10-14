@@ -293,6 +293,7 @@ const socketHandler = (io) => {
           content: messageType === "text" ? content : null,
           messageType,
           readBy: [{ user: socket.user._id, readAt: new Date() }],
+          tenancyInviteContext: 'none', // Regular message
         };
 
         // Add file info if messageType is not text
@@ -350,6 +351,7 @@ const socketHandler = (io) => {
           isReadBySender: true,
           totalParticipants: chat.participants.length,
           readCount: newMessage.readBy.length,
+          tenancyInviteContext: 'none', // Regular message
         };
 
         io.to(chatId).emit("new-message", messageWithReadInfo);
@@ -423,6 +425,7 @@ const socketHandler = (io) => {
                 createdAt: newMessage.createdAt,
               },
               timestamp: new Date(),
+              tenancyInviteContext: 'none', // Regular message
             });
             io.to(participantId.toString()).emit("refresh-contacts");
           }
@@ -946,6 +949,683 @@ const socketHandler = (io) => {
       const data = await response.json();
       if (data.success) {
         setContacts(data.data);
+      }
+    });
+
+    // Property Inquiry Events
+    socket.on("join-inquiry-notifications", (callback) => {
+      try {
+        // Join user to their inquiry notification room
+        const notificationRoom = `inquiry-notifications-${socket.userId}`;
+        socket.join(notificationRoom);
+        console.log(`[SOCKET] User ${socket.user.fullName} joined inquiry notifications room: ${notificationRoom}`);
+        
+        if (callback) {
+          callback({
+            success: true,
+            message: "Successfully joined inquiry notifications",
+            room: notificationRoom
+          });
+        }
+      } catch (error) {
+        console.error(`[SOCKET] Error joining inquiry notifications for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to join inquiry notifications",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    // Tenancy Invite Events
+    socket.on("join-invite-notifications", (callback) => {
+      try {
+        // Join user to their invite notification room
+        const inviteNotificationRoom = `invite-notifications-${socket.userId}`;
+        socket.join(inviteNotificationRoom);
+        console.log(`[SOCKET] User ${socket.user.fullName} joined invite notifications room: ${inviteNotificationRoom}`);
+        
+        if (callback) {
+          callback({
+            success: true,
+            message: "Successfully joined invite notifications",
+            room: inviteNotificationRoom
+          });
+        }
+      } catch (error) {
+        console.error(`[SOCKET] Error joining invite notifications for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to join invite notifications",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    socket.on("tenancy-invite-action", async (data, callback) => {
+      try {
+        const { inviteId, action, responseMessage } = data;
+        
+        if (!inviteId || !action) {
+          return callback({
+            success: false,
+            message: "Invite ID and action are required"
+          });
+        }
+
+        // Validate action
+        if (!['accept', 'decline'].includes(action)) {
+          return callback({
+            success: false,
+            message: "Invalid action. Must be 'accept' or 'decline'"
+          });
+        }
+
+        console.log(`[SOCKET] User ${socket.user.fullName} performing ${action} on tenancy invite ${inviteId}`);
+
+        // Emit acknowledgment that action was received
+        if (callback) {
+          callback({
+            success: true,
+            message: `Tenancy invite ${action} action received`,
+            inviteId: inviteId,
+            action: action
+          });
+        }
+
+        // Note: The actual invite processing is handled by the REST API
+        // This socket event is for real-time UI updates and acknowledgment
+
+      } catch (error) {
+        console.error(`[SOCKET] Error handling tenancy invite action for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to process tenancy invite action",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    socket.on("mark-invite-notification-read", async (data, callback) => {
+      try {
+        const { inviteId } = data;
+        
+        if (!inviteId) {
+          return callback({
+            success: false,
+            message: "Invite ID is required"
+          });
+        }
+
+        console.log(`[SOCKET] User ${socket.user.fullName} marking tenancy invite notification as read: ${inviteId}`);
+
+        // Emit to other devices of the same user that notification was read
+        socket.to(socket.userId).emit("invite-notification-read", {
+          inviteId: inviteId,
+          readBy: socket.userId,
+          timestamp: new Date()
+        });
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Tenancy invite notification marked as read",
+            inviteId: inviteId
+          });
+        }
+
+      } catch (error) {
+        console.error(`[SOCKET] Error marking tenancy invite notification as read for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to mark tenancy invite notification as read",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    // Send Tenancy Invite through Chat
+    socket.on("send-tenancy-invite-chat", async (data, callback) => {
+      try {
+        const { 
+          tenantId, 
+          propertyId, 
+          message = "Thank you for taking the time to visit the property. After careful consideration, I would like to offer you the tenancy for this property. Please let me know at your earliest convenience whether you would like to accept or decline this offer, so we may proceed accordingly.",
+          rentalTerms = {}
+        } = data;
+        
+        if (!tenantId || !propertyId) {
+          return callback({
+            success: false,
+            message: "Tenant ID and Property ID are required"
+          });
+        }
+
+        // Validate that the user is an owner
+        if (socket.user.userType !== 'owner') {
+          return callback({
+            success: false,
+            message: "Only property owners can send tenancy invites"
+          });
+        }
+
+        // Import required models
+        const Property = require("../models/Property");
+        const Tenant = require("../models/Tenant");
+        const TenancyInvite = require("../models/TenancyInvite");
+
+        // Check if property exists and belongs to the owner
+        const property = await Property.findById(propertyId);
+        if (!property || property.owner.toString() !== socket.userId) {
+          return callback({
+            success: false,
+            message: "Property not found or you don't own this property"
+          });
+        }
+
+        // Check if tenant exists
+        const tenant = await Tenant.findById(tenantId);
+        if (!tenant) {
+          return callback({
+            success: false,
+            message: "Tenant not found"
+          });
+        }
+
+        // Create or find existing chat between owner and tenant
+        let chat = await Chat.findOne({
+          participants: { $all: [socket.userId, tenantId] },
+          isGroupChat: false
+        });
+
+        // If no chat exists, create one
+        if (!chat) {
+          chat = new Chat({
+            participants: [socket.userId, tenantId],
+            isGroupChat: false,
+            lastActivity: new Date()
+          });
+          await chat.save();
+          console.log(`[SOCKET] Created new chat ${chat._id} for tenancy invite`);
+        }
+
+        // Create tenancy invite record
+        const invite = new TenancyInvite({
+          property: propertyId,
+          tenant: tenantId,
+          owner: socket.userId,
+          inviteType: "tenancy_offer",
+          message: message.trim(),
+          rentalTerms
+        });
+
+        await invite.save();
+
+        // Populate the invite for auto message generation
+        const populatedInvite = await TenancyInvite.findById(invite._id)
+          .populate('property', 'title propertyType monthlyRent images propertyId address')
+          .populate('tenant', 'fullName profilePhoto phonenumber emailId')
+          .populate('owner', 'fullName profilePhoto phonenumber');
+
+        // Generate auto message
+        const autoMessage = populatedInvite.generateAutoMessage();
+        populatedInvite.autoGeneratedMessage = autoMessage;
+        await populatedInvite.save();
+
+        // Create the tenancy invite message in the chat
+        const inviteMessage = await Message.create({
+          chat: chat._id,
+          sender: socket.userId,
+          senderModel: "Owner",
+          messageType: "text",
+          content: `🏠 **TENANCY INVITATION**\n\n${autoMessage}\n\n📋 **Original Message:**\n${message.trim()}`,
+          readBy: [{ user: socket.userId, readAt: new Date() }],
+          tenancyInviteContext: 'none', // Regular message
+        });
+
+        // Populate sender details
+        await inviteMessage.populate({
+          path: "sender",
+          select: "fullName email phoneNumber profilePhoto userType",
+        });
+
+        // Update chat with the invite message
+        chat.lastMessage = inviteMessage._id;
+        chat.lastActivity = new Date();
+        
+        // Increment unread count for tenant
+        chat.incrementUnreadCount(tenantId);
+        await chat.save();
+
+        // Broadcast message to chat room
+        const messageWithReadInfo = {
+          ...inviteMessage.toObject(),
+          readBy: inviteMessage.readBy.map((read) => ({
+            user: read.user,
+            readAt: read.readAt,
+          })),
+          isReadBySender: true,
+          totalParticipants: chat.participants.length,
+          readCount: inviteMessage.readBy.length,
+          tenancyInviteContext: 'none', // Regular message
+        };
+
+        // Send to chat room
+        io.to(chat._id.toString()).emit("new-message", messageWithReadInfo);
+
+        // Send unread count update to tenant
+        io.to(tenantId.toString()).emit("unread-count-updated", {
+          chatId: chat._id,
+          unreadCount: chat.getUnreadCount(tenantId),
+          newMessage: {
+            _id: inviteMessage._id,
+            content: inviteMessage.content,
+            messageType: inviteMessage.messageType,
+            sender: {
+              _id: socket.userId,
+              fullName: socket.user.fullName,
+            },
+            createdAt: inviteMessage.createdAt,
+          },
+          timestamp: new Date(),
+          tenancyInviteContext: 'none', // Regular message
+        });
+
+        // Refresh contacts for tenant
+        io.to(tenantId.toString()).emit("refresh-contacts");
+
+        // Send tenancy invite notification to tenant
+        io.to(tenantId.toString()).emit('new-tenancy-invite', {
+          invite: populatedInvite,
+          autoMessage: autoMessage,
+          chatId: chat._id,
+          message: `New tenancy invitation from ${socket.user.fullName}`,
+          timestamp: new Date(),
+          type: 'tenancy_invite',
+          tenancyInviteContext: 'none', // Regular message
+        });
+
+        // Also send to tenant's notification room
+        io.to(`invite-notifications-${tenantId.toString()}`).emit('tenancy-invitation', {
+          type: 'new_tenancy_invite',
+          invite: populatedInvite,
+          autoMessage: autoMessage,
+          chatId: chat._id,
+          message: `${socket.user.fullName} invited you to rent ${property.title}`,
+          timestamp: new Date(),
+          tenancyInviteContext: 'none', // Regular message
+        });
+
+        console.log(`[SOCKET] User ${socket.user.fullName} sent tenancy invite through chat to tenant ${tenantId}`);
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Tenancy invite sent successfully through chat",
+            data: {
+              invite: populatedInvite,
+              chat: chat,
+              inviteMessage: inviteMessage,
+              autoGeneratedMessage: autoMessage
+            }
+          });
+        }
+
+      } catch (error) {
+        console.error(`[SOCKET] Error sending tenancy invite through chat for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to send tenancy invite through chat",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    // Real-time Tenancy Invite Messages
+    socket.on("send-invite-message", async (data, callback) => {
+      try {
+        const { inviteId, message, messageType = "text" } = data;
+        
+        if (!inviteId || !message) {
+          return callback({
+            success: false,
+            message: "Invite ID and message are required"
+          });
+        }
+
+        // Find the invite to get participants
+        const TenancyInvite = require("../models/TenancyInvite");
+        const invite = await TenancyInvite.findById(inviteId)
+          .populate('owner', 'fullName profilePhoto userType')
+          .populate('tenant', 'fullName profilePhoto userType')
+          .populate('property', 'title address');
+
+        if (!invite) {
+          return callback({
+            success: false,
+            message: "Tenancy invite not found"
+          });
+        }
+
+        // Check if user is participant in this invite
+        const isOwner = invite.owner._id.toString() === socket.userId;
+        const isTenant = invite.tenant._id.toString() === socket.userId;
+        
+        if (!isOwner && !isTenant) {
+          return callback({
+            success: false,
+            message: "Unauthorized to send message on this invite"
+          });
+        }
+
+        // Create real-time message object
+        const inviteMessage = {
+          _id: Date.now().toString(), // Temporary ID for real-time
+          inviteId: inviteId,
+          sender: {
+            _id: socket.user._id,
+            fullName: socket.user.fullName,
+            userType: socket.user.userType,
+            profilePhoto: socket.user.profilePhoto
+          },
+          message: message,
+          messageType: messageType,
+          timestamp: new Date(),
+          property: {
+            _id: invite.property._id,
+            title: invite.property.title,
+            address: invite.property.address
+          }
+        };
+
+        // Send message to both participants
+        const recipientId = isOwner ? invite.tenant._id.toString() : invite.owner._id.toString();
+        
+        // Send to recipient
+        io.to(recipientId).emit("new-invite-message", {
+          ...inviteMessage,
+          isFromSender: false
+        });
+        
+        // Send confirmation to sender
+        socket.emit("invite-message-sent", {
+          ...inviteMessage,
+          isFromSender: true
+        });
+
+        console.log(`[SOCKET] User ${socket.user.fullName} sent invite message on tenancy invite ${inviteId}`);
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Invite message sent successfully",
+            data: inviteMessage
+          });
+        }
+
+      } catch (error) {
+        console.error(`[SOCKET] Error sending invite message for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to send invite message",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    // Join tenancy invite conversation
+    socket.on("join-invite-conversation", async (inviteId, callback) => {
+      try {
+        console.log(`[SOCKET] User ${socket.user.fullName} joining invite conversation: ${inviteId}`);
+
+        // Verify user is participant in this invite
+        const TenancyInvite = require("../models/TenancyInvite");
+        const invite = await TenancyInvite.findById(inviteId);
+        
+        if (!invite) {
+          return callback({
+            success: false,
+            message: "Tenancy invite not found"
+          });
+        }
+
+        const isParticipant = invite.owner.toString() === socket.userId || 
+                             invite.tenant.toString() === socket.userId;
+
+        if (!isParticipant) {
+          console.warn(`[SOCKET] User ${socket.userId} unauthorized to join invite conversation ${inviteId}`);
+          return callback({
+            success: false,
+            message: "Unauthorized to join this invite conversation"
+          });
+        }
+
+        const inviteRoom = `invite-${inviteId}`;
+        socket.join(inviteRoom);
+        
+        console.log(`[SOCKET] User ${socket.user.fullName} successfully joined invite conversation ${inviteId}`);
+
+        // Notify other participant that user joined
+        socket.to(inviteRoom).emit("user-joined-invite-conversation", {
+          userId: socket.userId,
+          fullName: socket.user.fullName,
+          userType: socket.user.userType,
+          inviteId: inviteId,
+          timestamp: new Date()
+        });
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Successfully joined invite conversation",
+            inviteId: inviteId,
+            room: inviteRoom
+          });
+        }
+
+      } catch (error) {
+        console.error(`[SOCKET] Error joining invite conversation ${inviteId} for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to join invite conversation",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    // Leave tenancy invite conversation
+    socket.on("leave-invite-conversation", (inviteId, callback) => {
+      try {
+        const inviteRoom = `invite-${inviteId}`;
+        console.log(`[SOCKET] User ${socket.user.fullName} leaving invite conversation ${inviteId}`);
+
+        socket.leave(inviteRoom);
+
+        // Notify other participant that user left
+        socket.to(inviteRoom).emit("user-left-invite-conversation", {
+          userId: socket.userId,
+          fullName: socket.user.fullName,
+          inviteId: inviteId,
+          timestamp: new Date()
+        });
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Successfully left invite conversation",
+            inviteId: inviteId
+          });
+        }
+
+      } catch (error) {
+        console.error(`[SOCKET] Error leaving invite conversation for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to leave invite conversation",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    // Handle typing in invite conversation
+    socket.on("invite-typing", (data, callback) => {
+      try {
+        const { inviteId } = data;
+        const inviteRoom = `invite-${inviteId}`;
+        
+        socket.to(inviteRoom).emit("user-typing-invite", {
+          userId: socket.userId,
+          fullName: socket.user.fullName,
+          inviteId: inviteId,
+          timestamp: new Date()
+        });
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Typing status sent"
+          });
+        }
+      } catch (error) {
+        console.error(`[SOCKET] Error sending invite typing status:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to send typing status",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    socket.on("invite-stop-typing", (data, callback) => {
+      try {
+        const { inviteId } = data;
+        const inviteRoom = `invite-${inviteId}`;
+        
+        socket.to(inviteRoom).emit("user-stop-typing-invite", {
+          userId: socket.userId,
+          inviteId: inviteId,
+          timestamp: new Date()
+        });
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Stop typing status sent"
+          });
+        }
+      } catch (error) {
+        console.error(`[SOCKET] Error sending invite stop typing status:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to send stop typing status",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    socket.on("inquiry-action", async (data, callback) => {
+      try {
+        const { inquiryId, action, responseMessage } = data;
+        
+        if (!inquiryId || !action) {
+          return callback({
+            success: false,
+            message: "Inquiry ID and action are required"
+          });
+        }
+
+        // Validate action
+        if (!['accept', 'decline'].includes(action)) {
+          return callback({
+            success: false,
+            message: "Invalid action. Must be 'accept' or 'decline'"
+          });
+        }
+
+        console.log(`[SOCKET] User ${socket.user.fullName} performing ${action} on inquiry ${inquiryId}`);
+
+        // Emit acknowledgment that action was received
+        if (callback) {
+          callback({
+            success: true,
+            message: `Inquiry ${action} action received`,
+            inquiryId: inquiryId,
+            action: action
+          });
+        }
+
+        // Note: The actual inquiry processing is handled by the REST API
+        // This socket event is for real-time UI updates and acknowledgment
+
+      } catch (error) {
+        console.error(`[SOCKET] Error handling inquiry action for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to process inquiry action",
+            error: error.message
+          });
+        }
+      }
+    });
+
+    socket.on("mark-inquiry-notification-read", async (data, callback) => {
+      try {
+        const { inquiryId } = data;
+        
+        if (!inquiryId) {
+          return callback({
+            success: false,
+            message: "Inquiry ID is required"
+          });
+        }
+
+        console.log(`[SOCKET] User ${socket.user.fullName} marking inquiry notification as read: ${inquiryId}`);
+
+        // Emit to other devices of the same user that notification was read
+        socket.to(socket.userId).emit("inquiry-notification-read", {
+          inquiryId: inquiryId,
+          readBy: socket.userId,
+          timestamp: new Date()
+        });
+
+        if (callback) {
+          callback({
+            success: true,
+            message: "Inquiry notification marked as read",
+            inquiryId: inquiryId
+          });
+        }
+
+      } catch (error) {
+        console.error(`[SOCKET] Error marking inquiry notification as read for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to mark inquiry notification as read",
+            error: error.message
+          });
+        }
       }
     });
 

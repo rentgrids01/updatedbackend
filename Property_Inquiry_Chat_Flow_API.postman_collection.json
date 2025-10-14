@@ -1,0 +1,388 @@
+{
+  "info": {
+    "name": "Property Inquiry & Chat Flow API",
+    "description": "Complete API collection for testing the property inquiry and automatic chat creation flow",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login as Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emailId\": \"tenant@example.com\",\n  \"password\": \"password123\",\n  \"userType\": \"tenant\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login as Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emailId\": \"owner@example.com\",\n  \"password\": \"password123\",\n  \"userType\": \"owner\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Property Inquiry Flow - Tenant",
+      "item": [
+        {
+          "name": "Send Property Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenant_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"propertyId\": \"{{property_id}}\",\n  \"message\": \"Hi, I'm very interested in this property and would like to know more details. When would be a good time to visit?\",\n  \"inquiryType\": \"property_interest\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "send"]
+            }
+          }
+        },
+        {
+          "name": "Get My Inquiries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenant_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/tenant/my-inquiries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "tenant", "my-inquiries"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Chat from Inquiry",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenant_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/{{inquiry_id}}/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "{{inquiry_id}}", "chat"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Property Inquiry Flow - Owner",
+      "item": [
+        {
+          "name": "Get Pending Inquiries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/owner/pending",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "owner", "pending"]
+            }
+          }
+        },
+        {
+          "name": "Get All Inquiries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/owner/all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "owner", "all"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Accept Inquiry (Creates Chat)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{owner_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"responseMessage\": \"Thank you for your interest! I'd be happy to show you the property. The property is available for viewing this weekend. Please let me know your preferred time.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/{{inquiry_id}}/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "{{inquiry_id}}", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Decline Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{owner_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"responseMessage\": \"Thank you for your interest. Unfortunately, the property is no longer available for rent.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/{{inquiry_id}}/decline",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "{{inquiry_id}}", "decline"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Inquiry Details",
+      "item": [
+        {
+          "name": "Get Inquiry Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/{{inquiry_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "{{inquiry_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Chat System (After Inquiry Accepted)",
+      "item": [
+        {
+          "name": "Get All Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chat"]
+            }
+          }
+        },
+        {
+          "name": "Send Message in Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Great! How about Saturday at 2 PM?\",\n  \"chatId\": \"{{chat_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/messages/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "messages", "send"]
+            }
+          }
+        },
+        {
+          "name": "Get Messages from Chat",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/messages/{{chat_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "messages", "{{chat_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Admin/Utility",
+      "item": [
+        {
+          "name": "Cleanup Expired Inquiries",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/property-inquiries/cleanup/expired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "property-inquiries", "cleanup", "expired"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:7000",
+      "type": "string"
+    },
+    {
+      "key": "tenant_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "owner_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "property_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "inquiry_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chat_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -77,6 +77,16 @@ const messageSchema = new mongoose.Schema({
   isDeleted: {
     type: Boolean,
     default: false
+  },
+  tenancyInviteContext: {
+    type: String,
+    enum: ['none', 'invite_message', 'tenant_only', 'owner_only', 'tenant_application'],
+    default: 'none'
+  },
+  tenancyInviteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TenancyInvite',
+    default: null
   }
 }, {
   timestamps: true
@@ -110,6 +120,8 @@ messageSchema.index({ chat: 1, createdAt: -1 });
 messageSchema.index({ sender: 1 });
 messageSchema.index({ chat: 1, isDeleted: 1 });
 messageSchema.index({ "readBy.user": 1 });
+messageSchema.index({ tenancyInviteId: 1 });
+messageSchema.index({ chat: 1, tenancyInviteId: 1 });
 
 // Instance method to check if message is read by specific user
 messageSchema.methods.isReadByUser = function(userId) {
