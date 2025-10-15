@@ -31,7 +31,8 @@ const {
   getSetupStatus,
   verifyVisitRequest,
   inviteToTenant,
-  actionOnInviteFromTenant
+  allInvites,
+  actionOnInviteFromTenant,
 } = require("../controllers/ownerController");
 const { auth, requireUserType } = require("../middleware/auth");
 const upload = require("../middleware/upload");
@@ -42,15 +43,23 @@ const router = express.Router();
 router.use(auth);
 router.use(requireUserType(["owner"]));
 
-router.get('/dashboard',getDashboard)
+router.get("/dashboard", getDashboard);
 
 // 🚀 Multi-Step Profile Setup Routes
 router.post("/profile/setup/initialize", initializeProfileSetup);
 router.post("/profile/setup/:setupId/personal-details", savePersonalDetails);
 router.post("/profile/setup/:setupId/avatar", selectAvatar);
-router.post("/profile/setup/:setupId/photo", upload.single("uploadedImage"), uploadSetupPhoto);
+router.post(
+  "/profile/setup/:setupId/photo",
+  upload.single("uploadedImage"),
+  uploadSetupPhoto
+);
 router.post("/profile/setup/:setupId/complete-profile", completeProfileDetails);
-router.post("/profile/setup/:setupId/id-document", upload.single("uploadedIdFile"), uploadIdDocument);
+router.post(
+  "/profile/setup/:setupId/id-document",
+  upload.single("uploadedIdFile"),
+  uploadIdDocument
+);
 router.post("/profile/setup/:setupId/finalize", finalizeProfileSetup);
 router.get("/profile/setup/:setupId/status", getSetupStatus);
 
@@ -75,7 +84,10 @@ router.patch(
   "/property/:propertyId/preferred-tenants/:preferredTenantId",
   updatePreferredTenant
 );
-router.delete("/property/:preferredTenantId/preferred-tenants", deletePreferredTenant);
+router.delete(
+  "/property/:preferredTenantId/preferred-tenants",
+  deletePreferredTenant
+);
 
 // Visit Requests
 router.get("/visit-requests", getVisitRequests);
@@ -97,9 +109,9 @@ router.patch(
 // Reschedule Visit Request
 router.patch("/visit-requests/:requestId/reschedule", RescheduleVisit);
 
-
 // Get all offers for owner
-router.post('/invites-to-tenant',inviteToTenant)
-router.patch('/invites-from-tenant/:inviteId/action',actionOnInviteFromTenant)
+router.post("/invites-to-tenant", inviteToTenant);
+router.patch("/invites-from-tenant/:inviteId/action", actionOnInviteFromTenant);
+router.get("/invites-to-tenant", allInvites);
 
 module.exports = router;

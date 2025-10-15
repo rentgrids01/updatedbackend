@@ -1006,6 +1006,33 @@ const socketHandler = (io) => {
       }
     });
 
+    // General Notification Events
+    socket.on("join-notifications", (callback) => {
+      try {
+        // Join user to their general notification room
+        const notificationRoom = `notifications-${socket.userId}`;
+        socket.join(notificationRoom);
+        console.log(`[SOCKET] User ${socket.user.fullName} joined general notifications room: ${notificationRoom}`);
+        
+        if (callback) {
+          callback({
+            success: true,
+            message: "Successfully joined general notifications",
+            room: notificationRoom
+          });
+        }
+      } catch (error) {
+        console.error(`[SOCKET] Error joining general notifications for user ${socket.userId}:`, error);
+        if (callback) {
+          callback({
+            success: false,
+            message: "Failed to join general notifications",
+            error: error.message
+          });
+        }
+      }
+    });
+
     socket.on("tenancy-invite-action", async (data, callback) => {
       try {
         const { inviteId, action, responseMessage } = data;

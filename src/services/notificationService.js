@@ -4,6 +4,7 @@ const Notification = require("../models/Notification");
  * createNotification
  * - recipient: ObjectId of the recipient
  * - recipientModel: string name of the model the recipient belongs to (e.g. 'Tenant' or 'Owner')
+ * - io: Socket.IO instance for real-time emissions (optional)
  */
 const createNotification = async ({
   recipient,
@@ -13,6 +14,7 @@ const createNotification = async ({
   message,
   data = {},
   relatedId,
+  io = null,
 }) => {
   const payload = {
     recipient,
@@ -32,6 +34,29 @@ const createNotification = async ({
     });
     const n = await Notification.create(payload);
     console.debug("Notification created ->", n._id?.toString?.());
+
+    // Emit real-time notification if Socket.IO instance is provided
+    if (io && n) {
+      const recipientId = recipient.toString();
+      
+      // Emit to user's personal room
+      io.to(recipientId).emit("new-notification", {
+        notification: n,
+        timestamp: new Date(),
+        event: "notification_created"
+      });
+
+      // Emit to user's notification room
+      const notificationRoom = `notifications-${recipientId}`;
+      io.to(notificationRoom).emit("notification-created", {
+        notification: n,
+        timestamp: new Date(),
+        type: type
+      });
+
+      console.log(`[NOTIFICATION] Real-time notification sent for ${type} to user ${recipientId}`);
+    }
+
     return n;
   } catch (err) {
     console.error("notificationService.createNotification error:", err && err.message ? err.message : err);

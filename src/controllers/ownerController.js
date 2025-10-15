@@ -733,26 +733,26 @@ const verifyVisitRequest = async (req, res) => {
   }
 };
 
-// const allInvites = async (req, res) => {
-//   try {
-//     const ownerId = req.user._id;
-//     const invite = await Invite.find()
-//       .populate("tenant", "fullName emailId")
-//       .populate("property", "title location");
+const allInvites = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const invite = await Invite.find()
+      .populate("tenant", "fullName emailId")
+      .populate("property", "title location");
 
-//     res.json({
-//       success: true,
-//       message: "Finalized offers retrieved successfully",
-//       data: invite,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching finalized offers:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//     });
-//   }
-// };
+    res.json({
+      success: true,
+      message: "Finalized offers retrieved successfully",
+      data: invite,
+    });
+  } catch (error) {
+    console.error("Error fetching finalized offers:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 
 const inviteToTenant = async (req, res) => {
   try {
@@ -1881,4 +1881,5 @@ module.exports = {
   verifyVisitRequest,
   actionOnInviteFromTenant,
   inviteToTenant,
+  allInvites
 };
